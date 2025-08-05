@@ -696,18 +696,16 @@ class WorldManager:
         if not self.process or self.process.poll() is not None:
             raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
         
-        time.sleep(2)
-
+        time.sleep(2)  # Initial delay to ensure simulation readiness
+        
         prefix = "ign" if self.version == "fortress" else "gz"
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
+        
         for model in self.models:
             if model["status"] == "new":
                 sdf_snippet = self.generate_model_sdf(model)
-                # Escape double quotes for command-line compatibility
                 sdf_escaped = sdf_snippet.replace('"', '\\"')
-                # Compact the SDF string by removing extra whitespace
                 sdf_compact = ' '.join(sdf_escaped.split())
-                # Construct the request string
                 request_str = f'sdf: "{sdf_compact}"'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/create",
                     "--reqtype", f"{reqtype_prefix}.EntityFactory",
@@ -721,11 +719,13 @@ class WorldManager:
                 if result.returncode != 0:
                     print(f"Warning: Failed to add model {model['name']}: {result.stderr}")
                     continue
-                # Add to SDF and save
+                time.sleep(1)  # Add a 1-second delay after each successful addition
+                # Add the model to the SDF file and save
                 model_elem = ET.fromstring(sdf_snippet)
                 self.sdf_root.find("world").append(model_elem)
                 self.save_sdf(self.world_path)
             elif model["status"] == "removed":
+                # Handle removal (unchanged)
                 request_str = f'name: "{model["name"]}" type: 2'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
                     "--reqtype", f"{reqtype_prefix}.Entity",
@@ -742,6 +742,8 @@ class WorldManager:
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
+        
+        # Update model statuses
         self.models = [m for m in self.models if m["status"] != "removed"]
         for model in self.models:
             model["status"] = ""
@@ -774,9 +776,10 @@ class WorldManager:
             elif model_type == "sphere":
                 size_str = f"{size[0]:.6f}"  # radius
 
-        # Generate the SDF string without <sdf> wrapper
+        # Generate the SDF string with <type> element
         sdf = f"""<model name='{model["name"]}'>
             <static>true</static>
+            <type>{model_type}</type>
             <pose>{pose}</pose>
             <link name='link'>
                 <collision name='collision'>
