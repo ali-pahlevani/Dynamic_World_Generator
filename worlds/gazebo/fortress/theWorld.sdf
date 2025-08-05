@@ -246,5 +246,65 @@
                     </material>
                 </visual>
             </link>
+        </model><model name="wall_17">
+            <static>true</static>
+            <type>wall</type>
+            <pose>-1.550000 2.900000 0.500000 0 0 0.000000</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>2.100000 0.300000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>2.100000 0.300000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>1 0 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_18">
+            <static>true</static>
+            <type>wall</type>
+            <pose>0.900000 3.500000 0.500000 0 0 1.892547</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>1.264911 0.300000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>1.264911 0.300000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>1 0 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_19">
+            <static>true</static>
+            <type>wall</type>
+            <pose>-1.200000 4.500000 0.500000 0 0 2.850136</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>2.088061 0.300000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>2.088061 0.300000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>1 0 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_20">
+            <static>true</static>
+            <type>wall</type>
+            <pose>-0.800000 6.200000 0.500000 0 0 0.197396</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>3.059412 0.300000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>3.059412 0.300000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>1 0 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
         </model></world>
 </sdf>
