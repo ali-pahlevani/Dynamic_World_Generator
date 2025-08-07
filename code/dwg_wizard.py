@@ -407,10 +407,6 @@ class StaticObstaclesPage(QWizardPage):
 
         self.setLayout(layout)
 
-        self.drawing = False
-        self.start_point = None
-        self.current_item = None
-
         self.update_input_fields()
 
     def initializePage(self):
@@ -442,77 +438,62 @@ class StaticObstaclesPage(QWizardPage):
         return QPointF(x, y)
 
     def eventFilter(self, obj, event):
-        if obj == self.view:
-            if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self.world_manager:
-                self.drawing = True
-                self.start_point = self.view.mapToScene(event.pos())
-                obstacle_type = self.obstacle_type_combo.currentText()
-                if obstacle_type == "Box":
-                    self.current_item = QGraphicsRectItem(QRectF(self.start_point, self.start_point))
-                    self.current_item.setPen(QPen(Qt.black, 2))
-                    self.current_item.setBrush(QColor("lightgray"))
-                elif obstacle_type in ["Cylinder", "Sphere"]:
-                    self.current_item = QGraphicsEllipseItem(QRectF(self.start_point, self.start_point))
-                    self.current_item.setPen(QPen(Qt.black, 2))
-                    self.current_item.setBrush(QColor("lightgray"))
-                self.scene.addItem(self.current_item)
-                return True
-            elif event.type() == QEvent.MouseMove and self.drawing and self.current_item:
-                end_point = self.view.mapToScene(event.pos())
-                if isinstance(self.current_item, QGraphicsRectItem):
-                    rect = QRectF(self.start_point, end_point).normalized()
-                    self.current_item.setRect(rect)
-                elif isinstance(self.current_item, QGraphicsEllipseItem):
-                    radius = (end_point - self.start_point).manhattanLength() / 2
-                    center = self.start_point + (end_point - self.start_point) / 2
-                    self.current_item.setRect(center.x() - radius, center.y() - radius, 2 * radius, 2 * radius)
-                return True
-            elif event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton and self.drawing and self.world_manager:
-                self.drawing = False
-                obstacle_type = self.obstacle_type_combo.currentText()
-                obstacle_name = f"{obstacle_type.lower()}_{len(self.world_manager.models) + 1}"
-                center = self.snap_to_grid(self.current_item.rect().center())
-                x = center.x() / 100
-                y = center.y() / 100
-                if obstacle_type == "Box":
-                    rect = self.current_item.rect()
-                    width_m = rect.width() / 100
-                    depth_m = rect.height() / 100
-                    try:
-                        height_m = float(self.height_input.text() or 1.0)
-                    except ValueError:
-                        height_m = 1.0
-                    position_z = height_m / 2
-                    size = (width_m, depth_m, height_m)
-                elif obstacle_type == "Cylinder":
-                    rect = self.current_item.rect()
-                    radius_m = rect.width() / 2 / 100
-                    try:
-                        height_m = float(self.height_input.text() or 1.0)
-                    except ValueError:
-                        height_m = 1.0
-                    position_z = height_m / 2
-                    size = (radius_m, height_m)
-                elif obstacle_type == "Sphere":
-                    rect = self.current_item.rect()
-                    radius_m = rect.width() / 2 / 100
-                    position_z = radius_m
-                    size = (radius_m,)
+        if obj == self.view and event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self.world_manager:
+            clicked_point = self.view.mapToScene(event.pos())
+            center = self.snap_to_grid(clicked_point)
+            obstacle_type = self.obstacle_type_combo.currentText().lower()
+            try:
+                if obstacle_type == "box":
+                    W = float(self.width_input.text() or 0.1)
+                    L = float(self.length_input.text() or 0.1)
+                    H = float(self.height_input.text() or 1.0)
+                    half_width_pixels = (W / 2) * 100
+                    half_length_pixels = (L / 2) * 100
+                    rounded_half_width_pixels = round(half_width_pixels / 10) * 10
+                    rounded_half_length_pixels = round(half_length_pixels / 10) * 10
+                    rect_pixels = QRectF(center.x() - rounded_half_width_pixels, center.y() - rounded_half_length_pixels,
+                                         2 * rounded_half_width_pixels, 2 * rounded_half_length_pixels)
+                    item = QGraphicsRectItem(rect_pixels)
+                    size_m = (W, L, H)
+                    position_z = H / 2
+                elif obstacle_type == "cylinder":
+                    R = float(self.radius_input.text() or 0.5)
+                    H = float(self.height_input.text() or 1.0)
+                    radius_pixels = R * 100
+                    rect_pixels = QRectF(center.x() - radius_pixels, center.y() - radius_pixels, 2 * radius_pixels, 2 * radius_pixels)
+                    item = QGraphicsEllipseItem(rect_pixels)
+                    size_m = (R, H)
+                    position_z = H / 2
+                elif obstacle_type == "sphere":
+                    R = float(self.radius_input.text() or 0.5)
+                    radius_pixels = R * 100
+                    rect_pixels = QRectF(center.x() - radius_pixels, center.y() - radius_pixels, 2 * radius_pixels, 2 * radius_pixels)
+                    item = QGraphicsEllipseItem(rect_pixels)
+                    size_m = (R,)
+                    position_z = R
                 color = self.color_input.text() or "Gray"
+                obstacle_name = f"{obstacle_type}_{len(self.world_manager.models) + 1}"
+                x_m = center.x() / 100
+                y_m = center.y() / 100
                 obstacle = {
                     "name": obstacle_name,
-                    "type": obstacle_type.lower(),
+                    "type": obstacle_type,
                     "properties": {
-                        "position": (x, y, position_z),
-                        "size": size,
+                        "position": (x_m, y_m, position_z),
+                        "size": size_m,
                         "color": color
                     },
                     "status": "new"
                 }
                 self.world_manager.add_model(obstacle)
                 self.obstacle_list.addItem(obstacle_name)
-                self.obstacle_items[obstacle_name] = self.current_item
-                return True
+                item.setPen(QPen(Qt.black, 2))
+                item.setBrush(QColor("lightgray"))
+                self.scene.addItem(item)
+                self.obstacle_items[obstacle_name] = item
+            except ValueError:
+                QMessageBox.warning(self, "Invalid Input", "Please enter valid numeric values for dimensions.")
+            return True
         return super().eventFilter(obj, event)
 
     def remove_selected_obstacle(self):
