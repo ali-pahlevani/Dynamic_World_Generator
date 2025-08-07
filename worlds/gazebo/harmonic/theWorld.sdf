@@ -1,15 +1,15 @@
 <?xml version='1.0' encoding='utf-8'?>
-<sdf version="1.8">
+<sdf version="1.9">
   <world name="theWorld">
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>1000</real_time_update_rate>
     </physics>
-    <plugin name="ignition::gazebo::systems::Physics" filename="ignition-gazebo-physics-system" />
-    <plugin name="ignition::gazebo::systems::UserCommands" filename="ignition-gazebo-user-commands-system" />
-    <plugin name="ignition::gazebo::systems::SceneBroadcaster" filename="ignition-gazebo-scene-broadcaster-system" />
-    <plugin name="ignition::gazebo::systems::Contact" filename="ignition-gazebo-contact-system" />
+    <plugin name="gz::sim::systems::Physics" filename="ignition-gazebo-physics-system" />
+    <plugin name="gz::sim::systems::UserCommands" filename="ignition-gazebo-user-commands-system" />
+    <plugin name="gz::sim::systems::SceneBroadcaster" filename="ignition-gazebo-scene-broadcaster-system" />
+    <plugin name="gz::sim::systems::Contact" filename="ignition-gazebo-contact-system" />
     <gravity>0 0 -9.8</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
     <atmosphere type="adiabatic" />
@@ -49,9 +49,9 @@
             <specular>0.8 0.8 0.8 1</specular>
           </material>
         </visual>
-        <pose>0 0 0 0 0 0</pose>
+        <pose>0 0 0 0 -0 0</pose>
         <inertial>
-          <pose>0 0 0 0 0 0</pose>
+          <pose>0 0 0 0 -0 0</pose>
           <mass>1</mass>
           <inertia>
             <ixx>1</ixx>
@@ -64,11 +64,11 @@
         </inertial>
         <enable_wind>false</enable_wind>
       </link>
-      <pose>0 0 0 0 0 0</pose>
+      <pose>0 0 0 0 -0 0</pose>
       <self_collide>false</self_collide>
     </model>
     <light name="sun" type="directional">
-      <pose>0 0 10 0 0 0</pose>
+      <pose>0 0 10 0 -0 0</pose>
       <cast_shadows>true</cast_shadows>
       <intensity>1</intensity>
       <direction>-0.5 0.1 -0.9</direction>
@@ -77,7 +77,7 @@
       <attenuation>
         <range>1000</range>
         <linear>0.01</linear>
-        <constant>0.9</constant>
+        <constant>0.90000000000000002</constant>
         <quadratic>0.001</quadratic>
       </attenuation>
       <spot>
