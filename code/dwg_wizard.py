@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import math
 from xml.etree import ElementTree as ET
-from PyQt5.QtWidgets import QWizard, QWizardPage, QListWidget, QVBoxLayout, QHBoxLayout, QWidget, QApplication, QPushButton, QLabel, QLineEdit, QComboBox, QGraphicsView, QGraphicsScene, QMessageBox, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsTextItem
+from PyQt5.QtWidgets import QWizard, QWizardPage, QListWidget, QVBoxLayout, QHBoxLayout, QWidget, QApplication, QPushButton, QLabel, QLineEdit, QComboBox, QGraphicsView, QGraphicsScene, QMessageBox, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsTextItem, QFrame
 from PyQt5.QtCore import Qt, QRectF, QLineF, QPointF, QEvent, pyqtSignal, pyqtProperty
 from PyQt5.QtGui import QFont, QPen, QColor, QPixmap, QMovie
 import shlex
@@ -23,6 +23,16 @@ def get_color(color_name):
     return colors.get(color_name, (0.5, 0.5, 0.5))
 
 class ZoomableGraphicsView(QGraphicsView):
+    def __init__(self, scene):
+        super().__init__(scene)
+        self.scale_label = QLabel("1 pixel = 0.01 m", self)
+        self.scale_label.setStyleSheet("background: transparent; color: black;")
+        self.scale_label.setGeometry(10, self.height() - 30, 100, 20)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.scale_label.move(10, self.height() - 30)
+
     def wheelEvent(self, event):
         zoom_factor = 1.25 if event.angleDelta().y() > 0 else 0.8
         self.scale(zoom_factor, zoom_factor)
@@ -71,61 +81,78 @@ class SimSelectionPage(QWizardPage):
 
         layout = QHBoxLayout()
 
-        # Left: Gazebo section
+        # Gazebo section
+        gazebo_widget = QWidget()
         gazebo_layout = QVBoxLayout()
 
-        # Fortress subsection
-        fortress_layout = QHBoxLayout()
+        # Fortress
+        fortress_widget = QWidget()
+        fortress_layout = QVBoxLayout()
         fortress_label = QLabel("Gazebo Fortress")
-        fortress_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "fortress.jpg")
         fortress_image_label = QLabel()
+        fortress_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "fortress.jpg")
         if os.path.exists(fortress_image_path):
-            pixmap = QPixmap(fortress_image_path).scaled(300, 300, Qt.KeepAspectRatio)
+            pixmap = QPixmap(fortress_image_path).scaled(400, 400, Qt.KeepAspectRatio)
             fortress_image_label.setPixmap(pixmap)
         else:
             fortress_image_label.setText("Fortress image not found")
+        fortress_image_label.setFixedSize(400, 400)
         self.fortress_button = QPushButton("Select Fortress")
         self.fortress_button.clicked.connect(lambda: self.select_gazebo_version("fortress"))
         fortress_layout.addWidget(fortress_label)
         fortress_layout.addWidget(fortress_image_label)
         fortress_layout.addWidget(self.fortress_button)
-        gazebo_layout.addLayout(fortress_layout)
+        fortress_widget.setLayout(fortress_layout)
+        gazebo_layout.addWidget(fortress_widget)
 
-        # Harmonic subsection
-        harmonic_layout = QHBoxLayout()
+        # Harmonic
+        harmonic_widget = QWidget()
+        harmonic_layout = QVBoxLayout()
         harmonic_label = QLabel("Gazebo Harmonic")
-        harmonic_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "harmonic.jpg")
         harmonic_image_label = QLabel()
+        harmonic_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "harmonic.jpg")
         if os.path.exists(harmonic_image_path):
-            pixmap = QPixmap(harmonic_image_path).scaled(300, 300, Qt.KeepAspectRatio)
+            pixmap = QPixmap(harmonic_image_path).scaled(400, 400, Qt.KeepAspectRatio)
             harmonic_image_label.setPixmap(pixmap)
         else:
             harmonic_image_label.setText("Harmonic image not found")
+        harmonic_image_label.setFixedSize(400, 400)
         self.harmonic_button = QPushButton("Select Harmonic")
         self.harmonic_button.clicked.connect(lambda: self.select_gazebo_version("harmonic"))
         harmonic_layout.addWidget(harmonic_label)
         harmonic_layout.addWidget(harmonic_image_label)
         harmonic_layout.addWidget(self.harmonic_button)
-        gazebo_layout.addLayout(harmonic_layout)
+        harmonic_widget.setLayout(harmonic_layout)
+        gazebo_layout.addWidget(harmonic_widget)
 
-        layout.addLayout(gazebo_layout)
+        gazebo_widget.setLayout(gazebo_layout)
+        layout.addWidget(gazebo_widget)
 
-        # Right: Isaac Sim section
+        # Divider
+        divider = QFrame()
+        divider.setFrameShape(QFrame.VLine)
+        divider.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(divider)
+
+        # Isaac Sim section
+        isaac_widget = QWidget()
         isaac_layout = QVBoxLayout()
         isaac_label = QLabel("Isaac Sim (Under Development)")
-        isaac_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "isaacsim_gray.jpg")
         isaac_image_label = QLabel()
+        isaac_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "isaacsim_gray.jpg")
         if os.path.exists(isaac_image_path):
-            pixmap = QPixmap(isaac_image_path).scaled(300, 300, Qt.KeepAspectRatio)
+            pixmap = QPixmap(isaac_image_path).scaled(400, 400, Qt.KeepAspectRatio)
             isaac_image_label.setPixmap(pixmap)
         else:
             isaac_image_label.setText("Isaac Sim image not found")
+        isaac_image_label.setFixedSize(400, 400)
         self.isaac_button = QPushButton("Select Isaac Sim")
         self.isaac_button.setEnabled(False)
         isaac_layout.addWidget(isaac_label)
         isaac_layout.addWidget(isaac_image_label)
         isaac_layout.addWidget(self.isaac_button)
-        layout.addLayout(isaac_layout)
+        isaac_widget.setLayout(isaac_layout)
+        layout.addWidget(isaac_widget)
 
         self.setLayout(layout)
 
@@ -170,8 +197,8 @@ class WallsDesignPage(QWizardPage):
         self.registerField("world_name", self)
         self.registerField("wall_list", self)
         self.world_manager = None
-        self.scene = scene  # Use shared scene
-        self.wall_items = {}  # Store (line, text) tuples
+        self.scene = scene
+        self.wall_items = {}
 
         layout = QHBoxLayout()
 
@@ -213,19 +240,12 @@ class WallsDesignPage(QWizardPage):
 
         layout.addLayout(left_layout, 30)
 
-        # Use ZoomableGraphicsView
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
         layout.addWidget(self.view, 70)
 
         self.setLayout(layout)
-
-        # Add scale text
-        scale_text = QGraphicsTextItem("1 pixel = 0.01 m")
-        self.scene.setSceneRect(-1000, -1000, 2000, 2000)  # Set a fixed scene size
-        scale_text.setPos(self.scene.width() - 100, self.scene.height() - 20)
-        self.scene.addItem(scale_text)
 
     def initializePage(self):
         self.world_manager = self.wizard().world_manager
@@ -262,10 +282,10 @@ class WallsDesignPage(QWizardPage):
                     line = QGraphicsLineItem(QLineF(self.start_point, end_point))
                     line.setPen(QPen(Qt.black, 2))
                     self.scene.addItem(line)
-                    text = QGraphicsTextItem(wall_name)  # Add wall name
+                    text = QGraphicsTextItem(wall_name)
                     text.setPos((self.start_point + end_point) / 2)
                     self.scene.addItem(text)
-                    self.wall_items[wall_name] = (line, text)  # Store both
+                    self.wall_items[wall_name] = (line, text)
                     del self.start_point
                 return True
         return super().eventFilter(obj, event)
@@ -306,12 +326,9 @@ class WallsDesignPage(QWizardPage):
                 self.scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
             for y in range(-1000, 1000, grid_spacing):
                 self.scene.addLine(-1000, y, 1000, y, QPen(QColor("lightgray")))
-            scale_text = QGraphicsTextItem("1 pixel = 0.01 m")
-            self.scene.setSceneRect(-1000, -1000, 2000, 2000)
-            scale_text.setPos(self.scene.width() - 100, self.scene.height() - 20)
-            self.scene.addItem(scale_text)
             self.wall_items = {}
             QMessageBox.information(self, "Success", f"Created and loaded new world: {world_name}")
+            self.completeChanged.emit()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to create world: {str(e)}")
 
@@ -332,10 +349,6 @@ class WallsDesignPage(QWizardPage):
                 self.scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
             for y in range(-1000, 1000, grid_spacing):
                 self.scene.addLine(-1000, y, 1000, y, QPen(QColor("lightgray")))
-            scale_text = QGraphicsTextItem("1 pixel = 0.01 m")
-            self.scene.setSceneRect(-1000, -1000, 2000, 2000)
-            scale_text.setPos(self.scene.width() - 100, self.scene.height() - 20)
-            self.scene.addItem(scale_text)
             self.wall_items = {}
             for model in self.world_manager.models:
                 if model["type"] == "wall":
@@ -349,6 +362,7 @@ class WallsDesignPage(QWizardPage):
                     self.scene.addItem(text)
                     self.wall_items[model["name"]] = (line, text)
             QMessageBox.information(self, "Success", f"Loaded world: {world_name}")
+            self.completeChanged.emit()
         except FileNotFoundError as e:
             QMessageBox.critical(self, "Error", str(e))
         except Exception as e:
@@ -371,6 +385,10 @@ class WallsDesignPage(QWizardPage):
                     model["status"] = "removed"
                     break
             self.wall_list.takeItem(self.wall_list.row(selected))
+            for item in self.scene.items():
+                if isinstance(item, QGraphicsLineItem):
+                    if item.pen().color() != QColor("lightgray"):
+                        print(f"Remaining wall line: {item.line()}")
 
     def apply_changes(self):
         if not self.world_manager:
@@ -390,8 +408,8 @@ class StaticObstaclesPage(QWizardPage):
         super().__init__()
         self.setTitle("Add Static Obstacles")
         self.world_manager = None
-        self.scene = scene  # Use shared scene
-        self.obstacle_items = {}  # Store (item, text) tuples
+        self.scene = scene
+        self.obstacle_items = {}
 
         layout = QHBoxLayout()
 
@@ -434,20 +452,12 @@ class StaticObstaclesPage(QWizardPage):
 
         layout.addLayout(left_layout, 30)
 
-        # Use ZoomableGraphicsView
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
         layout.addWidget(self.view, 70)
 
         self.setLayout(layout)
-
-        # Add scale text (only if not already added)
-        if not any(isinstance(item, QGraphicsTextItem) and item.toPlainText() == "1 pixel = 0.01 m" for item in self.scene.items()):
-            self.scene.setSceneRect(-1000, -1000, 2000, 2000)
-            scale_text = QGraphicsTextItem("1 pixel = 0.01 m")
-            scale_text.setPos(self.scene.width() - 100, self.scene.height() - 20)
-            self.scene.addItem(scale_text)
 
         self.update_input_fields()
 
@@ -532,10 +542,10 @@ class StaticObstaclesPage(QWizardPage):
                 item.setPen(QPen(Qt.black, 2))
                 item.setBrush(QColor("lightgray"))
                 self.scene.addItem(item)
-                text = QGraphicsTextItem(obstacle_name)  # Add obstacle name
+                text = QGraphicsTextItem(obstacle_name)
                 text.setPos(center)
                 self.scene.addItem(text)
-                self.obstacle_items[obstacle_name] = (item, text)  # Store both
+                self.obstacle_items[obstacle_name] = (item, text)
             except ValueError:
                 QMessageBox.warning(self, "Invalid Input", "Please enter valid numeric values for dimensions.")
             return True
@@ -632,7 +642,7 @@ class WorldManager:
         self.sdf_tree = None
         self.sdf_root = None
         self.process = None
-        self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Move up one level to Dynamic_World_Generator
+        self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     def create_new_world(self, world_name):
         self.world_name = world_name
@@ -660,62 +670,54 @@ class WorldManager:
         if not os.path.exists(self.world_path):
             raise FileNotFoundError(f"World file not found: {self.world_path}")
 
-        # Launch the world
         if self.version == "fortress":
             cmd = ["ign", "gazebo", self.world_path]
         else:
             cmd = ["gz", "sim", self.world_path]
         self.process = subprocess.Popen(cmd)
 
-        # Parse the SDF
         self.sdf_tree = ET.parse(self.world_path)
         self.sdf_root = self.sdf_tree.getroot()
         self.world_name = self.sdf_root.find("world").get("name")
         self.models = []
 
-        # Iterate through models in the SDF
         for model_elem in self.sdf_root.findall(".//model"):
             name = model_elem.get("name")
             type_elem = model_elem.find("type")
             model_type = type_elem.text if type_elem is not None else None
-            
-            # Infer type if missing
+
             if model_type is None:
                 geometry = model_elem.find(".//geometry/box")
                 if geometry is not None:
                     model_type = "wall"
                 else:
                     model_type = "unknown"
-            
+
             properties = {}
             if model_type == "wall":
-                # Extract pose (x, y, z, roll, pitch, yaw)
                 pose_str = model_elem.find("pose").text
                 pose = [float(x) for x in pose_str.split()]
                 x, y, z, _, _, yaw = pose
-                
-                # Extract size (length, width, height)
+
                 size_str = model_elem.find(".//box/size").text
                 size = [float(x) for x in size_str.split()]
                 length, width, height = size
-                
-                # Calculate start and end points
+
                 dx = (length / 2) * math.cos(yaw)
                 dy = (length / 2) * math.sin(yaw)
                 start_x = x - dx
                 start_y = y - dy
                 end_x = x + dx
                 end_y = y + dy
-                
+
                 properties = {
                     "start": (start_x, start_y),
                     "end": (end_x, end_y),
                     "width": width,
                     "height": height,
-                    "color": "Gray"  # Default; could parse material if available
+                    "color": "Gray"
                 }
-            
-            # Add model to the list
+
             self.models.append({
                 "name": name,
                 "type": model_type,
@@ -729,24 +731,23 @@ class WorldManager:
     def apply_changes(self):
         if not self.process or self.process.poll() is not None:
             raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
-        
-        time.sleep(2)  # Initial delay to ensure simulation readiness
-        
+
+        time.sleep(2)
+
         prefix = "ign" if self.version == "fortress" else "gz"
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
-        
+
         for model in self.models:
             if model["status"] == "new":
-                # Generate SDF for service call (with <sdf> wrapper)
                 sdf_snippet_service = self.generate_model_sdf(model, for_service=True)
                 sdf_escaped = sdf_snippet_service.replace('"', '\\"')
                 sdf_compact = ' '.join(sdf_escaped.split())
                 request_str = f'sdf: "{sdf_compact}"'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/create",
-                    "--reqtype", f"{reqtype_prefix}.EntityFactory",
-                    "--reptype", f"{reqtype_prefix}.Boolean",
-                    "--timeout", "3000",
-                    "--req", request_str]
+                       "--reqtype", f"{reqtype_prefix}.EntityFactory",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", "3000",
+                       "--req", request_str]
                 print("Executing command:", " ".join(cmd))
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 print("Result stdout:", result.stdout)
@@ -754,8 +755,7 @@ class WorldManager:
                 if result.returncode != 0 or "data: true" not in result.stdout:
                     print(f"Warning: Failed to add model {model['name']}: {result.stderr}")
                     continue
-                time.sleep(1)  # Delay after each addition
-                # Generate SDF without wrapper for appending to file
+                time.sleep(1)
                 sdf_snippet_file = self.generate_model_sdf(model, for_service=False)
                 model_elem = ET.fromstring(sdf_snippet_file)
                 self.sdf_root.find("world").append(model_elem)
@@ -763,10 +763,10 @@ class WorldManager:
             elif model["status"] == "removed":
                 request_str = f'name: "{model["name"]}", type: 2'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
-                    "--reqtype", f"{reqtype_prefix}.Entity",
-                    "--reptype", f"{reqtype_prefix}.Boolean",
-                    "--timeout", "3000",
-                    "--req", request_str]
+                       "--reqtype", f"{reqtype_prefix}.Entity",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", "3000",
+                       "--req", request_str]
                 print("Executing command:", " ".join(cmd))
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 print("Result stdout:", result.stdout)
@@ -777,8 +777,7 @@ class WorldManager:
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
-        
-        # Update model statuses
+
         self.models = [m for m in self.models if m["status"] != "removed"]
         for model in self.models:
             model["status"] = ""
@@ -787,8 +786,7 @@ class WorldManager:
         model_type = model["type"]
         props = model["properties"]
         color_rgb = get_color(props["color"])
-        
-        # Calculate pose and size based on model type
+
         if model_type == "wall":
             start = props["start"]
             end = props["end"]
@@ -807,11 +805,10 @@ class WorldManager:
             if model_type == "box":
                 size_str = f"{size[0]:.6f} {size[1]:.6f} {size[2]:.6f}"
             elif model_type == "cylinder":
-                size_str = f"{size[0]:.6f} {size[1]:.6f}"  # radius, height
+                size_str = f"{size[0]:.6f} {size[1]:.6f}"
             elif model_type == "sphere":
-                size_str = f"{size[0]:.6f}"  # radius
+                size_str = f"{size[0]:.6f}"
 
-        # Generate the SDF string
         sdf = f"""<model name='{model["name"]}'>
             <static>true</static>
             <type>{model_type}</type>
@@ -842,8 +839,7 @@ class WorldManager:
                 </visual>
             </link>
         </model>"""
-        
-        # Wrap with <sdf> tag if needed (for service calls or full SDF)
+
         if for_service:
             sdf = f"""<sdf version='{self.sdf_version}'>{sdf}</sdf>"""
         return sdf
@@ -862,7 +858,7 @@ class DynamicWorldWizard(QWizard):
         print("Window flags and size set")
 
         self.world_manager = None
-        self.scene = QGraphicsScene()  # Shared scene for all pages
+        self.scene = QGraphicsScene()
 
         self.nav_list = QListWidget()
         self.nav_list.addItems(["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
@@ -897,9 +893,9 @@ class DynamicWorldWizard(QWizard):
         sim_selection_page = SimSelectionPage()
         self.addPage(sim_selection_page)
         print("Added SimSelectionPage")
-        self.addPage(WallsDesignPage(self.scene))  # Pass shared scene
+        self.addPage(WallsDesignPage(self.scene))
         print("Added WallsDesignPage")
-        self.addPage(StaticObstaclesPage(self.scene))  # Pass shared scene
+        self.addPage(StaticObstaclesPage(self.scene))
         print("Added StaticObstaclesPage")
         self.addPage(DynamicObstaclesPage())
         print("Added DynamicObstaclesPage")
