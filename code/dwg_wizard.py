@@ -253,7 +253,6 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.warning(self, "Error", "Please enter a valid world name.")
             return
         try:
-            # Use parent directory for worlds
             empty_world_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "worlds", "gazebo", self.world_manager.version, "empty_world.sdf")
             print(f"Copying empty world from: {empty_world_path}")
             if not os.path.exists(empty_world_path):
@@ -650,9 +649,17 @@ class WorldManager:
         for model_elem in self.sdf_root.findall(".//model"):
             name = model_elem.get("name")
             type_elem = model_elem.find("type")
-            model_type = type_elem.text if type_elem is not None else "unknown"
-            properties = {}
+            model_type = type_elem.text if type_elem is not None else None
             
+            # Infer type if missing
+            if model_type is None:
+                geometry = model_elem.find(".//geometry/box")
+                if geometry is not None:
+                    model_type = "wall"
+                else:
+                    model_type = "unknown"
+            
+            properties = {}
             if model_type == "wall":
                 # Extract pose (x, y, z, roll, pitch, yaw)
                 pose_str = model_elem.find("pose").text
@@ -664,7 +671,7 @@ class WorldManager:
                 size = [float(x) for x in size_str.split()]
                 length, width, height = size
                 
-                # Calculate start and end points based on center, length, and yaw
+                # Calculate start and end points
                 dx = (length / 2) * math.cos(yaw)
                 dy = (length / 2) * math.sin(yaw)
                 start_x = x - dx
@@ -672,13 +679,12 @@ class WorldManager:
                 end_x = x + dx
                 end_y = y + dy
                 
-                # Populate properties
                 properties = {
                     "start": (start_x, start_y),
                     "end": (end_x, end_y),
                     "width": width,
                     "height": height,
-                    "color": "Gray"  # Default color; adjust if stored in SDF
+                    "color": "Gray"  # Default; could parse material if available
                 }
             
             # Add model to the list
@@ -703,8 +709,9 @@ class WorldManager:
         
         for model in self.models:
             if model["status"] == "new":
-                sdf_snippet = self.generate_model_sdf(model)
-                sdf_escaped = sdf_snippet.replace('"', '\\"')
+                # Generate SDF for service call (with <sdf> wrapper)
+                sdf_snippet_service = self.generate_model_sdf(model, for_service=True)
+                sdf_escaped = sdf_snippet_service.replace('"', '\\"')
                 sdf_compact = ' '.join(sdf_escaped.split())
                 request_str = f'sdf: "{sdf_compact}"'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/create",
@@ -716,17 +723,17 @@ class WorldManager:
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 print("Result stdout:", result.stdout)
                 print("Result stderr:", result.stderr)
-                if result.returncode != 0:
+                if result.returncode != 0 or "data: true" not in result.stdout:
                     print(f"Warning: Failed to add model {model['name']}: {result.stderr}")
                     continue
-                time.sleep(1)  # Add a 1-second delay after each successful addition
-                # Add the model to the SDF file and save
-                model_elem = ET.fromstring(sdf_snippet)
+                time.sleep(1)  # Delay after each addition
+                # Generate SDF without wrapper for appending to file
+                sdf_snippet_file = self.generate_model_sdf(model, for_service=False)
+                model_elem = ET.fromstring(sdf_snippet_file)
                 self.sdf_root.find("world").append(model_elem)
                 self.save_sdf(self.world_path)
             elif model["status"] == "removed":
-                # Handle removal (unchanged)
-                request_str = f'name: "{model["name"]}" type: 2'
+                request_str = f'name: "{model["name"]}", type: 2'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
                     "--reqtype", f"{reqtype_prefix}.Entity",
                     "--reptype", f"{reqtype_prefix}.Boolean",
@@ -748,7 +755,7 @@ class WorldManager:
         for model in self.models:
             model["status"] = ""
 
-    def generate_model_sdf(self, model):
+    def generate_model_sdf(self, model, for_service=False):
         model_type = model["type"]
         props = model["properties"]
         color_rgb = get_color(props["color"])
@@ -776,7 +783,7 @@ class WorldManager:
             elif model_type == "sphere":
                 size_str = f"{size[0]:.6f}"  # radius
 
-        # Generate the SDF string with <type> element
+        # Generate the SDF string
         sdf = f"""<model name='{model["name"]}'>
             <static>true</static>
             <type>{model_type}</type>
@@ -807,6 +814,10 @@ class WorldManager:
                 </visual>
             </link>
         </model>"""
+        
+        # Wrap with <sdf> tag if needed (for service calls or full SDF)
+        if for_service:
+            sdf = f"""<sdf version='{self.sdf_version}'>{sdf}</sdf>"""
         return sdf
 
     def save_sdf(self, path):
