@@ -28,6 +28,8 @@ class ZoomableGraphicsView(QGraphicsView):
         self.scale_label = QLabel("1 pixel = 0.01 m", self)
         self.scale_label.setStyleSheet("background: transparent; color: black;")
         self.scale_label.setGeometry(10, self.height() - 30, 100, 20)
+        self.is_panning = False
+        self.last_pan_point = QPointF()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -36,6 +38,33 @@ class ZoomableGraphicsView(QGraphicsView):
     def wheelEvent(self, event):
         zoom_factor = 1.25 if event.angleDelta().y() > 0 else 0.8
         self.scale(zoom_factor, zoom_factor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            self.is_panning = True
+            self.last_pan_point = event.pos()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.is_panning:
+            delta = self.mapToScene(event.pos()) - self.mapToScene(self.last_pan_point)
+            self.horizontalScrollBar().setValue(int(self.horizontalScrollBar().value() - delta.x()))
+            self.verticalScrollBar().setValue(int(self.verticalScrollBar().value() - delta.y()))
+            self.last_pan_point = event.pos()
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MiddleButton and self.is_panning:
+            self.is_panning = False
+            self.setCursor(Qt.ArrowCursor)
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
 
 class WelcomePage(QWizardPage):
     def __init__(self):
@@ -92,11 +121,11 @@ class SimSelectionPage(QWizardPage):
         fortress_image_label = QLabel()
         fortress_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "fortress.jpg")
         if os.path.exists(fortress_image_path):
-            pixmap = QPixmap(fortress_image_path).scaled(400, 400, Qt.KeepAspectRatio)
+            pixmap = QPixmap(fortress_image_path).scaled(300, 300, Qt.KeepAspectRatio)
             fortress_image_label.setPixmap(pixmap)
         else:
             fortress_image_label.setText("Fortress image not found")
-        fortress_image_label.setFixedSize(400, 400)
+        fortress_image_label.setFixedSize(300, 300)
         self.fortress_button = QPushButton("Select Fortress")
         self.fortress_button.clicked.connect(lambda: self.select_gazebo_version("fortress"))
         fortress_layout.addWidget(fortress_label)
@@ -112,11 +141,11 @@ class SimSelectionPage(QWizardPage):
         harmonic_image_label = QLabel()
         harmonic_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "harmonic.jpg")
         if os.path.exists(harmonic_image_path):
-            pixmap = QPixmap(harmonic_image_path).scaled(400, 400, Qt.KeepAspectRatio)
+            pixmap = QPixmap(harmonic_image_path).scaled(300, 300, Qt.KeepAspectRatio)
             harmonic_image_label.setPixmap(pixmap)
         else:
             harmonic_image_label.setText("Harmonic image not found")
-        harmonic_image_label.setFixedSize(400, 400)
+        harmonic_image_label.setFixedSize(300, 300)
         self.harmonic_button = QPushButton("Select Harmonic")
         self.harmonic_button.clicked.connect(lambda: self.select_gazebo_version("harmonic"))
         harmonic_layout.addWidget(harmonic_label)
@@ -141,11 +170,11 @@ class SimSelectionPage(QWizardPage):
         isaac_image_label = QLabel()
         isaac_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "isaacsim_gray.jpg")
         if os.path.exists(isaac_image_path):
-            pixmap = QPixmap(isaac_image_path).scaled(400, 400, Qt.KeepAspectRatio)
+            pixmap = QPixmap(isaac_image_path).scaled(300, 300, Qt.KeepAspectRatio)
             isaac_image_label.setPixmap(pixmap)
         else:
             isaac_image_label.setText("Isaac Sim image not found")
-        isaac_image_label.setFixedSize(400, 400)
+        isaac_image_label.setFixedSize(300, 300)
         self.isaac_button = QPushButton("Select Isaac Sim")
         self.isaac_button.setEnabled(False)
         isaac_layout.addWidget(isaac_label)
@@ -343,24 +372,10 @@ class WallsDesignPage(QWizardPage):
         try:
             self.world_manager.load_world(world_name)
             self.wall_list.clear()
-            self.scene.clear()
-            grid_spacing = 10
-            for x in range(-1000, 1000, grid_spacing):
-                self.scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
-            for y in range(-1000, 1000, grid_spacing):
-                self.scene.addLine(-1000, y, 1000, y, QPen(QColor("lightgray")))
-            self.wall_items = {}
+            self.wizard().refresh_canvas(self.scene, self.wall_items, {})  # Refresh with all models
             for model in self.world_manager.models:
                 if model["type"] == "wall":
                     self.wall_list.addItem(model["name"])
-                    start = QPointF(model["properties"]["start"][0] * 100, model["properties"]["start"][1] * 100)
-                    end = QPointF(model["properties"]["end"][0] * 100, model["properties"]["end"][1] * 100)
-                    line = QGraphicsLineItem(QLineF(start, end))
-                    self.scene.addItem(line)
-                    text = QGraphicsTextItem(model["name"])
-                    text.setPos((start + end) / 2)
-                    self.scene.addItem(text)
-                    self.wall_items[model["name"]] = (line, text)
             QMessageBox.information(self, "Success", f"Loaded world: {world_name}")
             self.completeChanged.emit()
         except FileNotFoundError as e:
@@ -465,6 +480,15 @@ class StaticObstaclesPage(QWizardPage):
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            return
+        self.refresh_obstacles()
+
+    def refresh_obstacles(self):
+        self.obstacle_list.clear()
+        self.wizard().refresh_canvas(self.scene, {}, self.obstacle_items)  # Refresh with all models
+        for model in self.world_manager.models:
+            if model["type"] in ["box", "cylinder", "sphere"]:
+                self.obstacle_list.addItem(model["name"])
 
     def update_input_fields(self):
         obstacle_type = self.obstacle_type_combo.currentText()
@@ -583,19 +607,202 @@ class StaticObstaclesPage(QWizardPage):
         return self.world_manager is not None and self.world_manager.world_name is not None
 
 class DynamicObstaclesPage(QWizardPage):
-    def __init__(self):
+    def __init__(self, scene):
         super().__init__()
         self.setTitle("Add Dynamic Obstacles")
         self.world_manager = None
+        self.scene = scene  # Shared scene
+        self.obstacle_list = QListWidget()
+        self.motion_type_combo = QComboBox()
+        self.motion_type_combo.addItems(["Linear", "Elliptical", "Polygon"])
+        self.velocity_input = QLineEdit()
+        self.velocity_input.setPlaceholderText("Velocity (m/s)")
+        self.std_input = QLineEdit()
+        self.std_input.setPlaceholderText("Std of randomness in velocity")
+        self.semi_major_input = QLineEdit()
+        self.semi_major_input.setPlaceholderText("Semi-major axis for Elliptical")
+        self.semi_major_input.setEnabled(False)
+        self.semi_minor_input = QLineEdit()
+        self.semi_minor_input.setPlaceholderText("Semi-minor axis for Elliptical")
+        self.semi_minor_input.setEnabled(False)
+        self.start_button = QPushButton("Start Defining Path")
+        self.start_button.clicked.connect(self.start_path)
+        self.finish_button = QPushButton("Finish Path")
+        self.finish_button.clicked.connect(self.finish_path)
+        self.apply_button = QPushButton("Apply and Preview")
+        self.apply_button.clicked.connect(self.apply_changes)
 
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel("This page is under development."))
+        layout = QHBoxLayout()
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(self.motion_type_combo)
+        left_layout.addWidget(self.obstacle_list)
+        left_layout.addWidget(self.velocity_input)
+        left_layout.addWidget(self.std_input)
+        left_layout.addWidget(self.semi_major_input)
+        left_layout.addWidget(self.semi_minor_input)
+        left_layout.addWidget(self.start_button)
+        left_layout.addWidget(self.finish_button)
+        left_layout.addWidget(self.apply_button)
+        layout.addLayout(left_layout, 30)
+
+        self.view = ZoomableGraphicsView(self.scene)
+        self.view.setBackgroundBrush(QColor("white"))
+        self.view.installEventFilter(self)
+        layout.addWidget(self.view, 70)
+
         self.setLayout(layout)
+
+        self.current_obstacle = None
+        self.current_motion_type = None
+        self.path_items = {}  # obstacle_name: list of graphics items
+        self.points = []
+        self.clicking_enabled = False
+
+        self.motion_type_combo.currentTextChanged.connect(self.update_motion_type)
+        self.obstacle_list.itemClicked.connect(self.select_obstacle)
 
     def initializePage(self):
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            return
+        static_page = self.wizard().page(3)  # Assuming StaticObstaclesPage is the 4th page (index 3)
+        self.obstacle_list.clear()
+        for i in range(static_page.obstacle_list.count()):
+            self.obstacle_list.addItem(static_page.obstacle_list.item(i).text())
+
+    def update_motion_type(self, text):
+        self.current_motion_type = text.lower()
+        self.clear_path()
+        self.points = []
+        self.semi_major_input.setEnabled(self.current_motion_type == "elliptical")
+        self.semi_minor_input.setEnabled(self.current_motion_type == "elliptical")
+
+    def select_obstacle(self, item):
+        self.current_obstacle = item.text()
+        self.clear_path()
+        self.points = []
+        self.clicking_enabled = False
+
+    def start_path(self):
+        if self.current_obstacle and self.current_motion_type:
+            self.clicking_enabled = True
+            self.points = []
+            self.clear_path()
+
+    def finish_path(self):
+        self.clicking_enabled = False
+        self.draw_path(close_polygon=True if self.current_motion_type == "polygon" else False)
+        self.store_motion()
+
+    def eventFilter(self, obj, event):
+        if obj == self.view and event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self.clicking_enabled:
+            clicked_point = self.view.mapToScene(event.pos())
+            point = self.snap_to_grid(clicked_point)
+            self.points.append(point)
+            if self.current_motion_type == "linear" and len(self.points) == 2:
+                self.clicking_enabled = False
+                self.draw_path()
+                self.store_motion()
+            elif self.current_motion_type == "elliptical" and len(self.points) == 1:
+                self.clicking_enabled = False
+                self.draw_path()
+                self.store_motion()
+            elif self.current_motion_type == "polygon":
+                self.draw_path()
+            return True
+        return super().eventFilter(obj, event)
+
+    def snap_to_grid(self, point, grid_spacing=10):
+        x = round(point.x() / grid_spacing) * grid_spacing
+        y = round(point.y() / grid_spacing) * grid_spacing
+        return QPointF(x, y)
+
+    def clear_path(self):
+        if self.current_obstacle in self.path_items:
+            for item in self.path_items[self.current_obstacle]:
+                self.scene.removeItem(item)
+            del self.path_items[self.current_obstacle]
+
+    def draw_path(self, close_polygon=False):
+        self.clear_path()
+        items = []
+        color = {"linear": "red", "elliptical": "green", "polygon": "blue"}[self.current_motion_type]
+        if self.current_motion_type == "linear" and len(self.points) == 2:
+            line = QGraphicsLineItem(QLineF(self.points[0], self.points[1]))
+            line.setPen(QPen(QColor(color), 2))
+            self.scene.addItem(line)
+            items.append(line)
+        elif self.current_motion_type == "elliptical" and len(self.points) == 1:
+            try:
+                semi_major = float(self.semi_major_input.text() or 1.0)
+                semi_minor = float(self.semi_minor_input.text() or 0.5)
+            except ValueError:
+                QMessageBox.warning(self, "Invalid Input", "Please enter valid semi-major and semi-minor axes.")
+                return
+            model = next(m for m in self.world_manager.models if m["name"] == self.current_obstacle)
+            center_m = model["properties"]["position"][:2]
+            center = QPointF(center_m[0] * 100, center_m[1] * 100)
+            direction = self.points[0] - center
+            angle = math.degrees(math.atan2(direction.y(), direction.x()))
+            ellipse = QGraphicsEllipseItem(QRectF(-semi_major * 100, -semi_minor * 100, 2 * semi_major * 100, 2 * semi_minor * 100))
+            ellipse.setPos(center)
+            ellipse.setRotation(angle)
+            ellipse.setPen(QPen(QColor(color), 2))
+            self.scene.addItem(ellipse)
+            items.append(ellipse)
+        elif self.current_motion_type == "polygon" and len(self.points) >= 2:
+            for i in range(len(self.points) - 1):
+                line = QGraphicsLineItem(QLineF(self.points[i], self.points[i+1]))
+                line.setPen(QPen(QColor(color), 2))
+                self.scene.addItem(line)
+                items.append(line)
+            if close_polygon and len(self.points) >= 3:
+                line = QGraphicsLineItem(QLineF(self.points[-1], self.points[0]))
+                line.setPen(QPen(QColor(color), 2))
+                self.scene.addItem(line)
+                items.append(line)
+        self.path_items[self.current_obstacle] = items
+
+    def store_motion(self):
+        if not self.current_obstacle or not self.current_motion_type or not self.points:
+            return
+        try:
+            velocity = float(self.velocity_input.text() or 1.0)
+            std = float(self.std_input.text() or 0.1)
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Please enter valid velocity and std.")
+            return
+        model = next(m for m in self.world_manager.models if m["name"] == self.current_obstacle)
+        motion = {"type": self.current_motion_type, "velocity": velocity, "std": std}
+        if self.current_motion_type in ["linear", "polygon"]:
+            path_m = [(p.x() / 100, p.y() / 100) for p in self.points]
+            motion["path"] = path_m
+        elif self.current_motion_type == "elliptical":
+            semi_major = float(self.semi_major_input.text() or 1.0)
+            semi_minor = float(self.semi_minor_input.text() or 0.5)
+            center_m = model["properties"]["position"][:2]
+            center = QPointF(center_m[0] * 100, center_m[1] * 100)
+            direction = self.points[0] - center
+            angle = math.atan2(direction.y(), direction.x())
+            motion["semi_major"] = semi_major
+            motion["semi_minor"] = semi_minor
+            motion["angle"] = angle
+        model["properties"]["motion"] = motion
+        if "status" in model:
+            model["status"] = "updated"
+        else:
+            model["status"] = "new"  # Assuming new if not present
+
+    def apply_changes(self):
+        if not self.world_manager:
+            QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            return
+        try:
+            self.world_manager.apply_changes()
+            QMessageBox.information(self, "Success", "Changes applied successfully.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
 
     def isComplete(self):
         return self.world_manager is not None and self.world_manager.world_name is not None
@@ -642,6 +849,7 @@ class WorldManager:
         self.sdf_tree = None
         self.sdf_root = None
         self.process = None
+        self.script_process = None  # New attribute to track script process
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     def create_new_world(self, world_name):
@@ -687,36 +895,64 @@ class WorldManager:
             model_type = type_elem.text if type_elem is not None else None
 
             if model_type is None:
-                geometry = model_elem.find(".//geometry/box")
+                geometry = model_elem.find(".//geometry")
                 if geometry is not None:
-                    model_type = "wall"
-                else:
-                    model_type = "unknown"
+                    if geometry.find("box") is not None:
+                        model_type = "wall" if "wall" in name else "box"
+                    elif geometry.find("cylinder") is not None:
+                        model_type = "cylinder"
+                    elif geometry.find("sphere") is not None:
+                        model_type = "sphere"
+                    else:
+                        model_type = "unknown"
 
             properties = {}
-            if model_type == "wall":
-                pose_str = model_elem.find("pose").text
-                pose = [float(x) for x in pose_str.split()]
-                x, y, z, _, _, yaw = pose
+            pose_str = model_elem.find("pose").text
+            pose = [float(x) for x in pose_str.split()]
+            x, y, z, _, _, _ = pose  # Ignore orientation for obstacles
 
-                size_str = model_elem.find(".//box/size").text
-                size = [float(x) for x in size_str.split()]
-                length, width, height = size
-
-                dx = (length / 2) * math.cos(yaw)
-                dy = (length / 2) * math.sin(yaw)
-                start_x = x - dx
-                start_y = y - dy
-                end_x = x + dx
-                end_y = y + dy
-
-                properties = {
-                    "start": (start_x, start_y),
-                    "end": (end_x, end_y),
-                    "width": width,
-                    "height": height,
-                    "color": "Gray"
-                }
+            geometry = model_elem.find(".//geometry")
+            if geometry:
+                if model_type in ["wall", "box"]:
+                    size_str = geometry.find("box/size").text
+                    size = [float(s) for s in size_str.split()]
+                    if model_type == "wall":
+                        length, width, height = size
+                        yaw = pose[5]
+                        dx = (length / 2) * math.cos(yaw)
+                        dy = (length / 2) * math.sin(yaw)
+                        start_x = x - dx
+                        start_y = y - dy
+                        end_x = x + dx
+                        end_y = y + dy
+                        properties = {
+                            "start": (start_x, start_y),
+                            "end": (end_x, end_y),
+                            "width": width,
+                            "height": height,
+                            "color": "Gray"
+                        }
+                    else:
+                        properties = {
+                            "position": (x, y, z),
+                            "size": size,
+                            "color": "Gray"
+                        }
+                elif model_type == "cylinder":
+                    radius = float(geometry.find("cylinder/radius").text)
+                    length = float(geometry.find("cylinder/length").text)
+                    properties = {
+                        "position": (x, y, z),
+                        "size": (radius, length),
+                        "color": "Gray"
+                    }
+                elif model_type == "sphere":
+                    radius = float(geometry.find("sphere/radius").text)
+                    properties = {
+                        "position": (x, y, z),
+                        "size": (radius,),
+                        "color": "Gray"
+                    }
 
             self.models.append({
                 "name": name,
@@ -737,7 +973,28 @@ class WorldManager:
         prefix = "ign" if self.version == "fortress" else "gz"
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
 
-        for model in self.models:
+        for model in self.models[:]:  # Copy to avoid modification during iteration
+            if model["status"] == "updated":
+                # Remove the model first
+                request_str = f'name: "{model["name"]}", type: 2'
+                cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
+                       "--reqtype", f"{reqtype_prefix}.Entity",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", "3000",
+                       "--req", request_str]
+                print("Executing command:", " ".join(cmd))
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                print("Result stdout:", result.stdout)
+                print("Result stderr:", result.stderr)
+                if result.returncode != 0:
+                    print(f"Warning: Failed to remove model {model['name']} for update: {result.stderr}")
+                    continue
+                for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
+                    self.sdf_root.find("world").remove(elem)
+                self.save_sdf(self.world_path)
+                # Change status to new for re-adding
+                model["status"] = "new"
+
             if model["status"] == "new":
                 sdf_snippet_service = self.generate_model_sdf(model, for_service=True)
                 sdf_escaped = sdf_snippet_service.replace('"', '\\"')
@@ -778,9 +1035,135 @@ class WorldManager:
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
 
+        # Generate and run motion script if there are dynamic models
+        dynamic_models = [m for m in self.models if "motion" in m["properties"]]
+        if dynamic_models:
+            move_code_dir = os.path.join(self.base_dir, "worlds", "gazebo", self.version, "move_code")
+            os.makedirs(move_code_dir, exist_ok=True)
+            script_path = os.path.join(move_code_dir, f"{self.world_name}_moveObstacles.py")
+            with open(script_path, 'w') as f:
+                f.write('#!/usr/bin/env python3\n')
+                f.write('import subprocess\n')
+                f.write('import time\n')
+                f.write('import random\n')
+                f.write('import math\n\n')
+                f.write(f'prefix = "{"ign" if self.version == "fortress" else "gz"}\"\n')
+                f.write(f'reqtype_prefix = "{"ignition.msgs" if self.version == "fortress" else "gz.msgs"}\"\n')
+                f.write(f'world_name = "{self.world_name}"\n\n')
+                f.write('def set_pose(model_name, x, y, z):\n')
+                f.write('    request_str = f\'name: "{model_name}", position {{ x: {x} y: {y} z: {z} }}, orientation {{ w: 1 }}\'\n')
+                f.write('    cmd = [prefix, "service", "-s", f"/world/{world_name}/set_pose", "--reqtype", f"{reqtype_prefix}.Pose", "--reptype", f"{reqtype_prefix}.Boolean", "--timeout", "500", "--req", request_str]\n')
+                f.write('    result = subprocess.run(cmd, capture_output=True, text=True)\n')
+                f.write('    if result.returncode != 0:\n')
+                f.write('        print(f"Failed to set pose for {model_name}: {result.stderr}")\n')
+                f.write('        return False\n')
+                f.write('    return True\n\n')
+                f.write('motions = {}\nstates = {}\n')
+                for m in dynamic_models:
+                    motion = m["properties"]["motion"]
+                    z = m["properties"]["position"][2]
+                    state = {}
+                    if motion["type"] == "linear":
+                        start, end = motion["path"]
+                        state = {'current_pos': list(start), 'direction': 1, 'start': list(start), 'end': list(end), 'z': z}
+                    elif motion["type"] == "elliptical":
+                        state = {'theta': 0.0, 'center': list(m["properties"]["position"][:2]), 'semi_major': motion["semi_major"], 'semi_minor': motion["semi_minor"], 'angle': motion["angle"], 'z': z}
+                    elif motion["type"] == "polygon":
+                        state = {'current_segment': 0, 't': 0.0, 'path': [list(p) for p in motion["path"]], 'z': z}
+                    f.write(f'motions["{m["name"]}"] = {motion}\n')
+                    f.write(f'states["{m["name"]}"] = {state}\n')
+                f.write('\ndt = 0.005\nwhile True:\n')
+                f.write('    try:\n')
+                f.write('        for model_name, motion in motions.items():\n')
+                f.write('            state = states[model_name]\n')
+                f.write('            velocity = random.gauss(motion["velocity"], motion["std"])\n')
+                f.write('            delta = velocity * dt\n')
+                f.write('            if motion["type"] == "linear":\n')
+                f.write('                start = state["start"]\n')
+                f.write('                end = state["end"]\n')
+                f.write('                dx = end[0] - start[0]\n')
+                f.write('                dy = end[1] - start[1]\n')
+                f.write('                length = math.sqrt(dx**2 + dy**2)\n')
+                f.write('                if length < 0.001: continue\n')  # Skip if path is too short
+                f.write('                unit_x = dx / length\n')
+                f.write('                unit_y = dy / length\n')
+                f.write('                new_x = state["current_pos"][0] + delta * state["direction"] * unit_x\n')
+                f.write('                new_y = state["current_pos"][1] + delta * state["direction"] * unit_y\n')
+                f.write('                dist_to_end = math.hypot(new_x - end[0], new_y - end[1])\n')
+                f.write('                dist_to_start = math.hypot(new_x - start[0], new_y - start[1])\n')
+                f.write('                if state["direction"] > 0 and dist_to_end < 0.01:\n')
+                f.write('                    new_x = end[0]\n')
+                f.write('                    new_y = end[1]\n')
+                f.write('                    state["direction"] = -state["direction"]\n')
+                f.write('                elif state["direction"] < 0 and dist_to_start < 0.01:\n')
+                f.write('                    new_x = start[0]\n')
+                f.write('                    new_y = start[1]\n')
+                f.write('                    state["direction"] = -state["direction"]\n')
+                f.write('                state["current_pos"] = [new_x, new_y]\n')
+                f.write('                if not set_pose(model_name, new_x, new_y, state["z"]):\n')
+                f.write('                    print(f"Stopping script as set_pose failed for {model_name}")\n')
+                f.write('                    exit(1)\n')
+                f.write('            elif motion["type"] == "elliptical":\n')
+                f.write('                delta_theta = velocity / (2 * math.pi * motion["semi_major"]) * 2 * math.pi * dt\n')
+                f.write('                state["theta"] += delta_theta\n')
+                f.write('                theta = state["theta"]\n')
+                f.write('                x = state["center"][0] + motion["semi_major"] * math.cos(theta) * math.cos(motion["angle"]) - motion["semi_minor"] * math.sin(theta) * math.sin(motion["angle"])\n')
+                f.write('                y = state["center"][1] + motion["semi_major"] * math.cos(theta) * math.sin(motion["angle"]) + motion["semi_minor"] * math.sin(theta) * math.cos(motion["angle"])\n')
+                f.write('                if not set_pose(model_name, x, y, state["z"]):\n')
+                f.write('                    print(f"Stopping script as set_pose failed for {model_name}")\n')
+                f.write('                    exit(1)\n')
+                f.write('            elif motion["type"] == "polygon":\n')
+                f.write('                path = state["path"]\n')
+                f.write('                start = path[state["current_segment"]]\n')
+                f.write('                end = path[(state["current_segment"] + 1) % len(path)]\n')
+                f.write('                dx = end[0] - start[0]\n')
+                f.write('                dy = end[1] - start[1]\n')
+                f.write('                length = math.sqrt(dx**2 + dy**2)\n')
+                f.write('                if length < 0.001: continue\n')  # Skip if segment is too short
+                f.write('                state["t"] += delta / length\n')
+                f.write('                if state["t"] >= 1:\n')
+                f.write('                    state["current_segment"] = (state["current_segment"] + 1) % len(path)\n')
+                f.write('                    state["t"] = max(0, state["t"] - 1)\n')
+                f.write('                t = min(1, state["t"])\n')
+                f.write('                x = start[0] + t * dx\n')
+                f.write('                y = start[1] + t * dy\n')
+                f.write('                if not set_pose(model_name, x, y, state["z"]):\n')
+                f.write('                    print(f"Stopping script as set_pose failed for {model_name}")\n')
+                f.write('                    exit(1)\n')
+                f.write('        time.sleep(dt)\n')
+                f.write('    except KeyboardInterrupt:\n')
+                f.write('        print("Motion script interrupted")\n')
+                f.write('        exit(0)\n')
+            os.chmod(script_path, 0o755)
+            # Terminate any existing script process before starting a new one
+            if self.script_process and self.script_process.poll() is None:
+                self.script_process.terminate()
+                try:
+                    self.script_process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    self.script_process.kill()
+            # Run the script and store the process
+            self.script_process = subprocess.Popen(['python3', script_path])
+
         self.models = [m for m in self.models if m["status"] != "removed"]
         for model in self.models:
             model["status"] = ""
+
+    def cleanup(self):
+        # Terminate the Gazebo process
+        if self.process and self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+        # Terminate the script process
+        if self.script_process and self.script_process.poll() is None:
+            self.script_process.terminate()
+            try:
+                self.script_process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.script_process.kill()
 
     def generate_model_sdf(self, model, for_service=False):
         model_type = model["type"]
@@ -809,8 +1192,9 @@ class WorldManager:
             elif model_type == "sphere":
                 size_str = f"{size[0]:.6f}"
 
+        static_str = "false" if "motion" in model["properties"] else "true"
         sdf = f"""<model name='{model["name"]}'>
-            <static>true</static>
+            <static>{static_str}</static>
             <type>{model_type}</type>
             <pose>{pose}</pose>
             <link name='link'>
@@ -853,7 +1237,7 @@ class DynamicWorldWizard(QWizard):
         print("Entering DynamicWorldWizard.__init__")
         super().__init__()
         self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
-        self.setWindowTitle("Dynamic World Generator Wizard")
+        self.setWindowTitle("Dynamic World Generator Wizard (V1)")
         self.resize(1200, 800)
         print("Window flags and size set")
 
@@ -897,7 +1281,7 @@ class DynamicWorldWizard(QWizard):
         print("Added WallsDesignPage")
         self.addPage(StaticObstaclesPage(self.scene))
         print("Added StaticObstaclesPage")
-        self.addPage(DynamicObstaclesPage())
+        self.addPage(DynamicObstaclesPage(self.scene))
         print("Added DynamicObstaclesPage")
         self.addPage(SaveResultsPage())
         print("Added SaveResultsPage")
@@ -915,6 +1299,59 @@ class DynamicWorldWizard(QWizard):
 
         self.currentIdChanged.connect(self.update_navigation)
         print("Connected currentIdChanged signal")
+
+    def refresh_canvas(self, scene, wall_items, obstacle_items):
+        scene.clear()
+        grid_spacing = 10
+        for x in range(-1000, 1000, grid_spacing):
+            scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
+        for y in range(-1000, 1000, grid_spacing):
+            scene.addLine(-1000, y, 1000, y, QPen(QColor("lightgray")))
+        wall_items.clear()
+        obstacle_items.clear()
+        if self.world_manager:
+            for model in self.world_manager.models:
+                if model["type"] == "wall":
+                    start = QPointF(model["properties"]["start"][0] * 100, model["properties"]["start"][1] * 100)
+                    end = QPointF(model["properties"]["end"][0] * 100, model["properties"]["end"][1] * 100)
+                    line = QGraphicsLineItem(QLineF(start, end))
+                    line.setPen(QPen(Qt.black, 2))
+                    scene.addItem(line)
+                    text = QGraphicsTextItem(model["name"])
+                    text.setPos((start + end) / 2)
+                    scene.addItem(text)
+                    wall_items[model["name"]] = (line, text)
+                elif model["type"] in ["box", "cylinder", "sphere"]:
+                    position = model["properties"]["position"]
+                    size = model["properties"]["size"]
+                    center = QPointF(position[0] * 100, position[1] * 100)
+                    if model["type"] == "box":
+                        W, L, _ = size
+                        half_width_pixels = (W / 2) * 100
+                        half_length_pixels = (L / 2) * 100
+                        rounded_half_width_pixels = round(half_width_pixels / 10) * 10
+                        rounded_half_length_pixels = round(half_length_pixels / 10) * 10
+                        rect_pixels = QRectF(center.x() - rounded_half_width_pixels, center.y() - rounded_half_length_pixels,
+                                            2 * rounded_half_width_pixels, 2 * rounded_half_length_pixels)
+                        item = QGraphicsRectItem(rect_pixels)
+                    else:  # cylinder or sphere
+                        R = size[0]
+                        radius_pixels = R * 100
+                        rect_pixels = QRectF(center.x() - radius_pixels, center.y() - radius_pixels, 2 * radius_pixels, 2 * radius_pixels)
+                        item = QGraphicsEllipseItem(rect_pixels)
+                    item.setPen(QPen(Qt.black, 2))
+                    item.setBrush(QColor("lightgray"))
+                    scene.addItem(item)
+                    text = QGraphicsTextItem(model["name"])
+                    text.setPos(center)
+                    scene.addItem(text)
+                    obstacle_items[model["name"]] = (item, text)
+
+    def closeEvent(self, event):
+            print("Closing DynamicWorldWizard")
+            if self.world_manager:
+                self.world_manager.cleanup()
+            event.accept()
 
     def initialize_world_manager(self, sim_type, version):
         print(f"Initializing WorldManager with sim_type={sim_type}, version={version}")
