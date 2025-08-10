@@ -86,5 +86,230 @@
         <falloff>0</falloff>
       </spot>
     </light>
-  </world>
+  <model name="wall_2">
+            <static>true</static>
+            <type>wall</type>
+            <pose>2.450000 1.100000 0.500000 0 0 0.000000</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>1.500000 0.100000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>1.500000 0.100000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_3">
+            <static>true</static>
+            <type>wall</type>
+            <pose>3.400000 1.600000 0.500000 0 0 1.190290</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>1.077033 0.100000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>1.077033 0.100000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_4">
+            <static>true</static>
+            <type>wall</type>
+            <pose>2.400000 3.600000 0.500000 0 0 2.245537</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>3.841875 0.100000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>3.841875 0.100000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_5">
+            <static>true</static>
+            <type>wall</type>
+            <pose>3.050000 5.600000 0.500000 0 0 0.263964</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>3.832754 0.100000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>3.832754 0.100000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_6">
+            <static>true</static>
+            <type>wall</type>
+            <pose>2.600000 6.600000 0.500000 0 0 2.927532</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>4.707441 0.100000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>4.707441 0.100000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_7">
+            <static>true</static>
+            <type>wall</type>
+            <pose>0.300000 4.900000 0.500000 0 0 -1.570796</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>4.400000 0.100000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>4.400000 0.100000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="wall_9">
+            <static>true</static>
+            <type>wall</type>
+            <pose>1.000000 1.900000 0.500000 0 0 -0.851966</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>2.126029 0.100000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>2.126029 0.100000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="box_10">
+            <static>true</static>
+            <type>box</type>
+            <pose>2.900000 1.500000 0.150000 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>0.300000 0.300000 0.300000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>0.300000 0.300000 0.300000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="box_11">
+            <static>true</static>
+            <type>box</type>
+            <pose>1.700000 1.900000 0.150000 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>0.300000 0.300000 0.300000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>0.300000 0.300000 0.300000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="cylinder_18">
+            <static>true</static>
+            <type>cylinder</type>
+            <pose>2.700000 6.300000 0.250000 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><cylinder><radius>0.100000</radius><length>0.500000</length></cylinder></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><cylinder><radius>0.100000</radius><length>0.500000</length></cylinder></geometry>
+                    <material>
+                        <diffuse>1 0 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="sphere_19">
+            <static>true</static>
+            <type>sphere</type>
+            <pose>1.700000 6.000000 0.100000 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><sphere><radius>0.100000</radius></sphere></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><sphere><radius>0.100000</radius></sphere></geometry>
+                    <material>
+                        <diffuse>1 0 0 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="box_17">
+            <static>false</static>
+            <type>box</type>
+            <pose>-0.600000 -0.300000 0.500000 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><box><size>1.000000 1.000000 1.000000</size></box></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><box><size>1.000000 1.000000 1.000000</size></box></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="cylinder_16">
+            <static>true</static>
+            <type>cylinder</type>
+            <pose>-1.000000 1.700000 0.500000 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><cylinder><radius>0.500000</radius><length>1.000000</length></cylinder></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><cylinder><radius>0.500000</radius><length>1.000000</length></cylinder></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="cylinder_17">
+            <static>true</static>
+            <type>cylinder</type>
+            <pose>0.900000 0.100000 0.500000 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><cylinder><radius>0.500000</radius><length>1.000000</length></cylinder></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><cylinder><radius>0.500000</radius><length>1.000000</length></cylinder></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model><model name="cylinder_18">
+            <static>true</static>
+            <type>cylinder</type>
+            <pose>-1.900000 -4.500000 0.500000 0 0 0</pose>
+            <link name="link">
+                <collision name="collision">
+                    <geometry><cylinder><radius>0.500000</radius><length>1.000000</length></cylinder></geometry>
+                </collision>
+                <visual name="visual">
+                    <geometry><cylinder><radius>0.500000</radius><length>1.000000</length></cylinder></geometry>
+                    <material>
+                        <diffuse>0.5 0.5 0.5 1</diffuse>
+                    </material>
+                </visual>
+            </link>
+        </model></world>
 </sdf>
