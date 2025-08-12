@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <sdf version="1.8">
-  <world name="whatTo">
+  <world name="theNewWorld">
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
@@ -86,65 +86,5 @@
         <falloff>0</falloff>
       </spot>
     </light>
-  <model name="wall_5">
-            <static>true</static>
-            <type>wall</type>
-            <pose>0.650000 -1.000000 1.500000 0 0 -0.398522</pose>
-            <link name="link">
-                <collision name="collision">
-                    <geometry><box><size>2.061553 0.300000 3.000000</size></box></geometry>
-                </collision>
-                <visual name="visual">
-                    <geometry><box><size>2.061553 0.300000 3.000000</size></box></geometry>
-                    <material>
-                        <diffuse>1 0 0 1</diffuse>
-                    </material>
-                </visual>
-            </link>
-        </model><model name="wall_6">
-            <static>true</static>
-            <type>wall</type>
-            <pose>1.400000 -0.350000 1.500000 0 0 1.934775</pose>
-            <link name="link">
-                <collision name="collision">
-                    <geometry><box><size>2.247221 0.300000 3.000000</size></box></geometry>
-                </collision>
-                <visual name="visual">
-                    <geometry><box><size>2.247221 0.300000 3.000000</size></box></geometry>
-                    <material>
-                        <diffuse>1 0 0 1</diffuse>
-                    </material>
-                </visual>
-            </link>
-        </model><model name="wall_7">
-            <static>true</static>
-            <type>wall</type>
-            <pose>-0.550000 1.450000 1.500000 0 0 -2.914794</pose>
-            <link name="link">
-                <collision name="collision">
-                    <geometry><box><size>1.334166 0.300000 3.000000</size></box></geometry>
-                </collision>
-                <visual name="visual">
-                    <geometry><box><size>1.334166 0.300000 3.000000</size></box></geometry>
-                    <material>
-                        <diffuse>1 0 0 1</diffuse>
-                    </material>
-                </visual>
-            </link>
-        </model><model name="wall_8">
-            <static>true</static>
-            <type>wall</type>
-            <pose>-1.050000 0.450000 1.500000 0 0 -0.367174</pose>
-            <link name="link">
-                <collision name="collision">
-                    <geometry><box><size>1.392839 0.300000 3.000000</size></box></geometry>
-                </collision>
-                <visual name="visual">
-                    <geometry><box><size>1.392839 0.300000 3.000000</size></box></geometry>
-                    <material>
-                        <diffuse>1 0 0 1</diffuse>
-                    </material>
-                </visual>
-            </link>
-        </model></world>
+  </world>
 </sdf>
