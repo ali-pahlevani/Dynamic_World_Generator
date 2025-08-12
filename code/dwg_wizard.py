@@ -6,7 +6,7 @@ import subprocess
 import math
 from xml.etree import ElementTree as ET
 from PyQt5.QtWidgets import QWizard, QWizardPage, QListWidget, QVBoxLayout, QHBoxLayout, QWidget, QApplication, QPushButton, QLabel, QLineEdit, QComboBox, QGraphicsView, QGraphicsScene, QMessageBox, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsTextItem, QFrame
-from PyQt5.QtCore import Qt, QRectF, QLineF, QPointF, QEvent, pyqtSignal, pyqtProperty
+from PyQt5.QtCore import Qt, QRectF, QLineF, QPointF, QEvent, pyqtSignal, QSize, pyqtProperty
 from PyQt5.QtGui import QFont, QPen, QColor, QPixmap, QMovie
 import shlex
 import time
@@ -69,13 +69,20 @@ class ZoomableGraphicsView(QGraphicsView):
 class WelcomePage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Welcome to the Dynamic World Generator Wizard!")
+        self.setTitle("Let's make a 'Dynamic World' together!")
 
-        layout = QVBoxLayout()
+        # Main layout for vertical centering
+        main_layout = QVBoxLayout()
+        main_layout.addStretch(1)  # Stretch above to center vertically
+
+        # Nested layout for title and GIF
+        content_layout = QVBoxLayout()
+        content_layout.setSpacing(10)  # Preserve 10-pixel spacing between title and GIF
 
         title_label = QLabel("Welcome to the Dynamic World Generator Wizard!")
-        title_label.setStyleSheet("font-size: 24pt; font-weight: bold;")
-        layout.addWidget(title_label)
+        title_label.setStyleSheet("font-size: 26pt; font-weight: bold; color: red;")
+        title_label.setAlignment(Qt.AlignCenter)  # Center horizontally
+        content_layout.addWidget(title_label)
 
         gif_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "welcome.gif")
         print(f"Looking for GIF at: {gif_path}")
@@ -83,13 +90,18 @@ class WelcomePage(QWizardPage):
         gif_label = QLabel()
         movie = QMovie(gif_path)
         if movie.isValid():
+            movie.setScaledSize(QSize(1200, 750))  # Set GIF size to 400x400 pixels
             gif_label.setMovie(movie)
             movie.start()
         else:
             gif_label.setText(f"Preview GIF not found at {gif_path}")
-        layout.addWidget(gif_label)
+        gif_label.setAlignment(Qt.AlignCenter)  # Center horizontally
+        content_layout.addWidget(gif_label)
 
-        self.setLayout(layout)
+        main_layout.addLayout(content_layout)
+        main_layout.addStretch(1)  # Stretch below to center vertically
+
+        self.setLayout(main_layout)
 
 class SimSelectionPage(QWizardPage):
     simulationSelected = pyqtSignal(str, str)
@@ -118,70 +130,104 @@ class SimSelectionPage(QWizardPage):
         fortress_widget = QWidget()
         fortress_layout = QVBoxLayout()
         fortress_label = QLabel("Gazebo Fortress")
+        fortress_label.setAlignment(Qt.AlignCenter)
+        fortress_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
+        fortress_label.setStyleSheet("color: red;")
         fortress_image_label = QLabel()
         fortress_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "fortress.jpg")
         if os.path.exists(fortress_image_path):
-            pixmap = QPixmap(fortress_image_path).scaled(300, 300, Qt.KeepAspectRatio)
+            pixmap = QPixmap(fortress_image_path).scaled(290, 290, Qt.KeepAspectRatio)
             fortress_image_label.setPixmap(pixmap)
         else:
             fortress_image_label.setText("Fortress image not found")
-        fortress_image_label.setFixedSize(300, 300)
+        fortress_image_label.setFixedSize(290, 290)
+        fortress_image_label.setAlignment(Qt.AlignCenter)
         self.fortress_button = QPushButton("Select Fortress")
+        self.fortress_button.setFont(QFont("Arial", 14))
+        self.fortress_button.setFixedHeight(50)
         self.fortress_button.clicked.connect(lambda: self.select_gazebo_version("fortress"))
         fortress_layout.addWidget(fortress_label)
-        fortress_layout.addWidget(fortress_image_label)
-        fortress_layout.addWidget(self.fortress_button)
+        fortress_layout.addSpacing(10)
+        fortress_layout.addWidget(fortress_image_label, alignment=Qt.AlignCenter)
+        fortress_layout.addSpacing(10)
+        fortress_layout.addWidget(self.fortress_button, alignment=Qt.AlignCenter)
+        fortress_layout.addStretch(1)
         fortress_widget.setLayout(fortress_layout)
         gazebo_layout.addWidget(fortress_widget)
+
+        # Horizontal separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        gazebo_layout.addWidget(separator)
 
         # Harmonic
         harmonic_widget = QWidget()
         harmonic_layout = QVBoxLayout()
         harmonic_label = QLabel("Gazebo Harmonic")
+        harmonic_label.setAlignment(Qt.AlignCenter)
+        harmonic_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
+        harmonic_label.setStyleSheet("color: red;")
         harmonic_image_label = QLabel()
         harmonic_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "harmonic.jpg")
         if os.path.exists(harmonic_image_path):
-            pixmap = QPixmap(harmonic_image_path).scaled(300, 300, Qt.KeepAspectRatio)
+            pixmap = QPixmap(harmonic_image_path).scaled(290, 290, Qt.KeepAspectRatio)
             harmonic_image_label.setPixmap(pixmap)
         else:
             harmonic_image_label.setText("Harmonic image not found")
-        harmonic_image_label.setFixedSize(300, 300)
+        harmonic_image_label.setFixedSize(290, 290)
+        harmonic_image_label.setAlignment(Qt.AlignCenter)
         self.harmonic_button = QPushButton("Select Harmonic")
+        self.harmonic_button.setFont(QFont("Arial", 14))
+        self.harmonic_button.setFixedHeight(50)
         self.harmonic_button.clicked.connect(lambda: self.select_gazebo_version("harmonic"))
         harmonic_layout.addWidget(harmonic_label)
-        harmonic_layout.addWidget(harmonic_image_label)
-        harmonic_layout.addWidget(self.harmonic_button)
+        harmonic_layout.addSpacing(10)
+        harmonic_layout.addWidget(harmonic_image_label, alignment=Qt.AlignCenter)
+        harmonic_layout.addSpacing(10)
+        harmonic_layout.addWidget(self.harmonic_button, alignment=Qt.AlignCenter)
+        harmonic_layout.addStretch(1)
         harmonic_widget.setLayout(harmonic_layout)
         gazebo_layout.addWidget(harmonic_widget)
-
+        gazebo_layout.addStretch(1)
         gazebo_widget.setLayout(gazebo_layout)
-        layout.addWidget(gazebo_widget)
+        layout.addWidget(gazebo_widget, stretch=1)
 
         # Divider
         divider = QFrame()
         divider.setFrameShape(QFrame.VLine)
         divider.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(divider)
+        layout.addWidget(divider, stretch=0)
 
         # Isaac Sim section
         isaac_widget = QWidget()
         isaac_layout = QVBoxLayout()
+        isaac_layout.addStretch(1)  # Add stretch above for vertical centering
         isaac_label = QLabel("Isaac Sim (Under Development)")
+        isaac_label.setAlignment(Qt.AlignCenter)
+        isaac_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
+        isaac_label.setStyleSheet("color: red;")
         isaac_image_label = QLabel()
         isaac_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "isaacsim_gray.jpg")
         if os.path.exists(isaac_image_path):
-            pixmap = QPixmap(isaac_image_path).scaled(300, 300, Qt.KeepAspectRatio)
+            pixmap = QPixmap(isaac_image_path).scaled(400, 400, Qt.KeepAspectRatio)
             isaac_image_label.setPixmap(pixmap)
         else:
             isaac_image_label.setText("Isaac Sim image not found")
-        isaac_image_label.setFixedSize(300, 300)
+        isaac_image_label.setFixedSize(400, 400)
+        isaac_image_label.setAlignment(Qt.AlignCenter)
         self.isaac_button = QPushButton("Select Isaac Sim")
+        self.isaac_button.setFont(QFont("Arial", 14))
+        self.isaac_button.setFixedHeight(50)
         self.isaac_button.setEnabled(False)
         isaac_layout.addWidget(isaac_label)
-        isaac_layout.addWidget(isaac_image_label)
-        isaac_layout.addWidget(self.isaac_button)
+        isaac_layout.addSpacing(10)
+        isaac_layout.addWidget(isaac_image_label, alignment=Qt.AlignCenter)
+        isaac_layout.addSpacing(10)
+        isaac_layout.addWidget(self.isaac_button, alignment=Qt.AlignCenter)
+        isaac_layout.addStretch(1)  # Add stretch below for vertical centering
         isaac_widget.setLayout(isaac_layout)
-        layout.addWidget(isaac_widget)
+        layout.addWidget(isaac_widget, stretch=1)
 
         self.setLayout(layout)
 
@@ -190,7 +236,8 @@ class SimSelectionPage(QWizardPage):
             QPushButton {
                 background-color: #4A90E2;
                 color: white;
-                padding: 10px;
+                padding: 15px;
+                font-size: 14pt;
             }
             QPushButton:hover {
                 background-color: #6AB0F3;
@@ -203,7 +250,8 @@ class SimSelectionPage(QWizardPage):
             QPushButton {
                 background-color: #A9A9A9;
                 color: white;
-                padding: 10px;
+                padding: 15px;
+                font-size: 14pt;
             }
         """)
 
@@ -217,7 +265,7 @@ class SimSelectionPage(QWizardPage):
 
     def isComplete(self):
         return self._simulation == "gazebo" and self._gazebo_version in ["fortress", "harmonic"]
-
+    
 class WallsDesignPage(QWizardPage):
     def __init__(self, scene):
         super().__init__()
@@ -1238,7 +1286,7 @@ class DynamicWorldWizard(QWizard):
         super().__init__()
         self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
         self.setWindowTitle("Dynamic World Generator Wizard (V1)")
-        self.resize(1200, 800)
+        self.resize(1500, 900)
         print("Window flags and size set")
 
         self.world_manager = None
@@ -1247,7 +1295,8 @@ class DynamicWorldWizard(QWizard):
         self.nav_list = QListWidget()
         self.nav_list.addItems(["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
                                 "Add Dynamic Obstacles", "Save Results"])
-        self.nav_list.setFixedWidth(200)
+        self.nav_list.setFixedWidth(260)  # Wider navigation bar
+        self.nav_list.setFont(QFont("Arial", 14, QFont.Bold))  # Explicitly set font to 18pt and bold
         self.nav_list.setStyleSheet("""
             QListWidget {
                 background-color: #2E2E2E;
@@ -1257,8 +1306,6 @@ class DynamicWorldWizard(QWizard):
             }
             QListWidget::item {
                 padding: 10px;
-                font-size: 16pt;
-                font-weight: bold;
             }
             QListWidget::item:selected {
                 background-color: #4A90E2;
@@ -1348,10 +1395,10 @@ class DynamicWorldWizard(QWizard):
                     obstacle_items[model["name"]] = (item, text)
 
     def closeEvent(self, event):
-            print("Closing DynamicWorldWizard")
-            if self.world_manager:
-                self.world_manager.cleanup()
-            event.accept()
+        print("Closing DynamicWorldWizard")
+        if self.world_manager:
+            self.world_manager.cleanup()
+        event.accept()
 
     def initialize_world_manager(self, sim_type, version):
         print(f"Initializing WorldManager with sim_type={sim_type}, version={version}")
