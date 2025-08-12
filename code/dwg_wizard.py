@@ -25,15 +25,15 @@ def get_color(color_name):
 class ZoomableGraphicsView(QGraphicsView):
     def __init__(self, scene):
         super().__init__(scene)
-        self.scale_label = QLabel("1 pixel = 0.01 m", self)
-        self.scale_label.setStyleSheet("background: transparent; color: black;")
-        self.scale_label.setGeometry(10, self.height() - 30, 100, 20)
+        self.scale_label = QLabel("1 pixel = 1 cm", self)
+        self.scale_label.setStyleSheet("background: transparent; font-size: 11pt; font-weight: bold; color: red;")
+        self.scale_label.setGeometry(10, self.height() - 38, 100, 20)
         self.is_panning = False
         self.last_pan_point = QPointF()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.scale_label.move(10, self.height() - 30)
+        self.scale_label.move(10, self.height() - 38)
 
     def wheelEvent(self, event):
         zoom_factor = 1.25 if event.angleDelta().y() > 0 else 0.8
@@ -1294,20 +1294,63 @@ class WorldManager:
             model["status"] = ""
 
     def cleanup(self):
+        import signal
+        print("Starting cleanup of WorldManager")
+        
+        # Save the current world state before closing
+        if self.sdf_tree and self.world_path:
+            try:
+                self.save_sdf(self.world_path)
+                print(f"Saved world state to {self.world_path}")
+            except Exception as e:
+                print(f"Warning: Failed to save world state: {str(e)}")
+
+        # Terminate the motion script process
+        if self.script_process and self.script_process.poll() is None:
+            print(f"Terminating motion script process (PID: {self.script_process.pid})")
+            try:
+                # Send SIGINT first for graceful shutdown
+                self.script_process.send_signal(signal.SIGINT)
+                self.script_process.wait(timeout=2)
+                print("Motion script process terminated gracefully")
+            except subprocess.TimeoutExpired:
+                print("Motion script process did not terminate gracefully, sending SIGTERM")
+                self.script_process.terminate()
+                try:
+                    self.script_process.wait(timeout=2)
+                    print("Motion script process terminated with SIGTERM")
+                except subprocess.TimeoutExpired:
+                    print("Motion script process still running, sending SIGKILL")
+                    self.script_process.kill()
+                    self.script_process.wait(timeout=2)
+                    print("Motion script process killed")
+            except Exception as e:
+                print(f"Error terminating motion script process: {str(e)}")
+            self.script_process = None
+
         # Terminate the Gazebo process
         if self.process and self.process.poll() is None:
-            self.process.terminate()
+            print(f"Terminating Gazebo process (PID: {self.process.pid})")
             try:
+                # Send SIGINT first for graceful shutdown
+                self.process.send_signal(signal.SIGINT)
                 self.process.wait(timeout=2)
+                print("Gazebo process terminated gracefully")
             except subprocess.TimeoutExpired:
-                self.process.kill()
-        # Terminate the script process
-        if self.script_process and self.script_process.poll() is None:
-            self.script_process.terminate()
-            try:
-                self.script_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                self.script_process.kill()
+                print("Gazebo process did not terminate gracefully, sending SIGTERM")
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=2)
+                    print("Gazebo process terminated with SIGTERM")
+                except subprocess.TimeoutExpired:
+                    print("Gazebo process still running, sending SIGKILL")
+                    self.process.kill()
+                    self.process.wait(timeout=2)
+                    print("Gazebo process killed")
+            except Exception as e:
+                print(f"Error terminating Gazebo process: {str(e)}")
+            self.process = None
+        print("Cleanup completed")
 
     def generate_model_sdf(self, model, for_service=False):
         model_type = model["type"]
