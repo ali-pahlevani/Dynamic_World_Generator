@@ -90,7 +90,7 @@ class WelcomePage(QWizardPage):
         gif_label = QLabel()
         movie = QMovie(gif_path)
         if movie.isValid():
-            movie.setScaledSize(QSize(1200, 750))  # Set GIF size to 400x400 pixels
+            movie.setScaledSize(QSize(1200, 750))  # Set GIF size to 1200x750 pixels
             gif_label.setMovie(movie)
             movie.start()
         else:
@@ -265,7 +265,7 @@ class SimSelectionPage(QWizardPage):
 
     def isComplete(self):
         return self._simulation == "gazebo" and self._gazebo_version in ["fortress", "harmonic"]
-    
+
 class WallsDesignPage(QWizardPage):
     def __init__(self, scene):
         super().__init__()
@@ -279,6 +279,7 @@ class WallsDesignPage(QWizardPage):
 
         layout = QHBoxLayout()
 
+        left_widget = QWidget()
         left_layout = QVBoxLayout()
         self.create_world_button = QPushButton("Create New World")
         self.create_world_button.clicked.connect(self.create_new_world)
@@ -314,13 +315,22 @@ class WallsDesignPage(QWizardPage):
         self.apply_button = QPushButton("Apply and Preview")
         self.apply_button.clicked.connect(self.apply_changes)
         left_layout.addWidget(self.apply_button)
-
-        layout.addLayout(left_layout, 30)
+        left_widget.setLayout(left_layout)
 
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
-        layout.addWidget(self.view, 70)
+
+        # Set size constraints: canvas at 70% of content width, left panel takes the rest
+        window_width = 1500  # Default wizard width
+        canvas_width = int(window_width * 0.7)  # 70% of window width
+        self.view.setMinimumWidth(int(800 * 0.7))  # Minimum canvas width (70% of 800px window)
+        self.view.setMaximumWidth(canvas_width)  # Initial canvas width
+        left_widget.setMinimumWidth(150)  # Minimum left panel width for usability
+        left_widget.setMaximumWidth(window_width - canvas_width - 260)  # Initial left panel width
+
+        layout.addWidget(left_widget)
+        layout.addWidget(self.view)
 
         self.setLayout(layout)
 
@@ -476,6 +486,7 @@ class StaticObstaclesPage(QWizardPage):
 
         layout = QHBoxLayout()
 
+        left_widget = QWidget()
         left_layout = QVBoxLayout()
         self.obstacle_type_combo = QComboBox()
         self.obstacle_type_combo.addItems(["Box", "Cylinder", "Sphere"])
@@ -512,13 +523,22 @@ class StaticObstaclesPage(QWizardPage):
         self.apply_button = QPushButton("Apply and Preview")
         self.apply_button.clicked.connect(self.apply_changes)
         left_layout.addWidget(self.apply_button)
-
-        layout.addLayout(left_layout, 30)
+        left_widget.setLayout(left_layout)
 
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
-        layout.addWidget(self.view, 70)
+
+        # Set size constraints: canvas at 70% of content width, left panel takes the rest
+        window_width = 1500  # Default wizard width
+        canvas_width = int(window_width * 0.7)  # 70% of window width
+        self.view.setMinimumWidth(int(800 * 0.7))  # Minimum canvas width (70% of 800px window)
+        self.view.setMaximumWidth(canvas_width)  # Initial canvas width
+        left_widget.setMinimumWidth(150)  # Minimum left panel width for usability
+        left_widget.setMaximumWidth(window_width - canvas_width - 260)  # Initial left panel width
+
+        layout.addWidget(left_widget)
+        layout.addWidget(self.view)
 
         self.setLayout(layout)
 
@@ -659,7 +679,7 @@ class DynamicObstaclesPage(QWizardPage):
         super().__init__()
         self.setTitle("Add Dynamic Obstacles")
         self.world_manager = None
-        self.scene = scene  # Shared scene
+        self.scene = scene
         self.obstacle_list = QListWidget()
         self.motion_type_combo = QComboBox()
         self.motion_type_combo.addItems(["Linear", "Elliptical", "Polygon"])
@@ -681,6 +701,8 @@ class DynamicObstaclesPage(QWizardPage):
         self.apply_button.clicked.connect(self.apply_changes)
 
         layout = QHBoxLayout()
+
+        left_widget = QWidget()
         left_layout = QVBoxLayout()
         left_layout.addWidget(self.motion_type_combo)
         left_layout.addWidget(self.obstacle_list)
@@ -691,12 +713,22 @@ class DynamicObstaclesPage(QWizardPage):
         left_layout.addWidget(self.start_button)
         left_layout.addWidget(self.finish_button)
         left_layout.addWidget(self.apply_button)
-        layout.addLayout(left_layout, 30)
+        left_widget.setLayout(left_layout)
 
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
-        layout.addWidget(self.view, 70)
+
+        # Set size constraints: canvas at 70% of content width, left panel takes the rest
+        window_width = 1500  # Default wizard width
+        canvas_width = int(window_width * 0.7)  # 70% of window width
+        self.view.setMinimumWidth(int(800 * 0.7))  # Minimum canvas width (70% of 800px window)
+        self.view.setMaximumWidth(canvas_width)  # Initial canvas width
+        left_widget.setMinimumWidth(150)  # Minimum left panel width for usability
+        left_widget.setMaximumWidth(window_width - canvas_width - 260)  # Initial left panel width
+
+        layout.addWidget(left_widget)
+        layout.addWidget(self.view)
 
         self.setLayout(layout)
 
@@ -840,7 +872,7 @@ class DynamicObstaclesPage(QWizardPage):
         if "status" in model:
             model["status"] = "updated"
         else:
-            model["status"] = "new"  # Assuming new if not present
+            model["status"] = "new"
 
     def apply_changes(self):
         if not self.world_manager:
@@ -855,17 +887,92 @@ class DynamicObstaclesPage(QWizardPage):
     def isComplete(self):
         return self.world_manager is not None and self.world_manager.world_name is not None
 
-class SaveResultsPage(QWizardPage):
+class ComingSoonPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Save Results")
+        self.setTitle("Coming Soon")
         self.world_manager = None
 
         layout = QVBoxLayout()
-        self.save_button = QPushButton("Save World")
-        self.save_button.clicked.connect(self.save_world)
-        layout.addWidget(self.save_button)
-        layout.addWidget(QLabel("Preview of future features..."))
+        layout.addStretch(1)  # Stretch above for vertical centering
+
+        # Container for images
+        images_widget = QWidget()
+        images_layout = QHBoxLayout()
+        images_layout.setSpacing(20)  # Space between image widgets
+
+        # Future 1
+        feature1_widget = QWidget()
+        feature1_layout = QVBoxLayout()
+        feature1_label = QLabel("Future 1")
+        feature1_label.setAlignment(Qt.AlignCenter)
+        feature1_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
+        feature1_label.setStyleSheet("color: red;")
+        feature1_image_label = QLabel()
+        feature1_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "future_1.jpg")
+        if os.path.exists(feature1_image_path):
+            pixmap = QPixmap(feature1_image_path).scaled(350, 350, Qt.KeepAspectRatio)
+            feature1_image_label.setPixmap(pixmap)
+        else:
+            feature1_image_label.setText("Future 1 image not found")
+        feature1_image_label.setFixedSize(350, 350)
+        feature1_image_label.setAlignment(Qt.AlignCenter)
+        feature1_layout.addWidget(feature1_image_label, alignment=Qt.AlignCenter)
+        feature1_layout.addSpacing(10)  # 10px spacing between image and label
+        feature1_layout.addWidget(feature1_label)
+        feature1_layout.addStretch(1)
+        feature1_widget.setLayout(feature1_layout)
+        images_layout.addWidget(feature1_widget)
+
+        # Future 2
+        feature2_widget = QWidget()
+        feature2_layout = QVBoxLayout()
+        feature2_label = QLabel("Future 2")
+        feature2_label.setAlignment(Qt.AlignCenter)
+        feature2_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
+        feature2_label.setStyleSheet("color: red;")
+        feature2_image_label = QLabel()
+        feature2_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "future_2.jpg")
+        if os.path.exists(feature2_image_path):
+            pixmap = QPixmap(feature2_image_path).scaled(350, 350, Qt.KeepAspectRatio)
+            feature2_image_label.setPixmap(pixmap)
+        else:
+            feature2_image_label.setText("Future 2 image not found")
+        feature2_image_label.setFixedSize(350, 350)
+        feature2_image_label.setAlignment(Qt.AlignCenter)
+        feature2_layout.addWidget(feature2_image_label, alignment=Qt.AlignCenter)
+        feature2_layout.addSpacing(10)  # 10px spacing between image and label
+        feature2_layout.addWidget(feature2_label)
+        feature2_layout.addStretch(1)
+        feature2_widget.setLayout(feature2_layout)
+        images_layout.addWidget(feature2_widget)
+
+        # Future 3
+        feature3_widget = QWidget()
+        feature3_layout = QVBoxLayout()
+        feature3_label = QLabel("Future 3")
+        feature3_label.setAlignment(Qt.AlignCenter)
+        feature3_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
+        feature3_label.setStyleSheet("color: red;")
+        feature3_image_label = QLabel()
+        feature3_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "future_3.jpg")
+        if os.path.exists(feature3_image_path):
+            pixmap = QPixmap(feature3_image_path).scaled(350, 350, Qt.KeepAspectRatio)
+            feature3_image_label.setPixmap(pixmap)
+        else:
+            feature3_image_label.setText("Future 3 image not found")
+        feature3_image_label.setFixedSize(350, 350)
+        feature3_image_label.setAlignment(Qt.AlignCenter)
+        feature3_layout.addWidget(feature3_image_label, alignment=Qt.AlignCenter)
+        feature3_layout.addSpacing(10)  # 10px spacing between image and label
+        feature3_layout.addWidget(feature3_label)
+        feature3_layout.addStretch(1)
+        feature3_widget.setLayout(feature3_layout)
+        images_layout.addWidget(feature3_widget)
+
+        images_widget.setLayout(images_layout)
+        layout.addWidget(images_widget, alignment=Qt.AlignCenter)
+        layout.addStretch(1)  # Stretch below for vertical centering
         self.setLayout(layout)
 
     def initializePage(self):
@@ -873,19 +980,8 @@ class SaveResultsPage(QWizardPage):
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
 
-    def save_world(self):
-        if not self.world_manager:
-            QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
-            return
-        try:
-            self.world_manager.save_sdf(self.world_manager.world_path)
-            QMessageBox.information(self, "Success", f"World saved to {self.world_manager.world_path}")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save world: {str(e)}")
-
     def isComplete(self):
         return self.world_manager is not None and self.world_manager.world_name is not None
-
 class WorldManager:
     def __init__(self, simulation, version):
         self.simulation = simulation
@@ -897,7 +993,7 @@ class WorldManager:
         self.sdf_tree = None
         self.sdf_root = None
         self.process = None
-        self.script_process = None  # New attribute to track script process
+        self.script_process = None
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     def create_new_world(self, world_name):
@@ -1287,6 +1383,7 @@ class DynamicWorldWizard(QWizard):
         self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
         self.setWindowTitle("Dynamic World Generator Wizard (V1)")
         self.resize(1500, 900)
+        self.setMinimumWidth(800)  # Set minimum window width to allow narrower resizing
         print("Window flags and size set")
 
         self.world_manager = None
@@ -1294,9 +1391,8 @@ class DynamicWorldWizard(QWizard):
 
         self.nav_list = QListWidget()
         self.nav_list.addItems(["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
-                                "Add Dynamic Obstacles", "Save Results"])
-        self.nav_list.setFixedWidth(260)  # Wider navigation bar
-        self.nav_list.setFont(QFont("Arial", 14, QFont.Bold))  # Explicitly set font to 18pt and bold
+                                "Add Dynamic Obstacles", "Coming Soon"])
+        self.nav_list.setFont(QFont("Arial", 14, QFont.Bold))  # Default font size
         self.nav_list.setStyleSheet("""
             QListWidget {
                 background-color: #2E2E2E;
@@ -1315,6 +1411,7 @@ class DynamicWorldWizard(QWizard):
                 background-color: #666666;
             }
         """)
+
         self.nav_list.setCurrentRow(0)
         self.nav_list.itemClicked.connect(self.navigate_to_page)
         print("Navigation list initialized")
@@ -1324,14 +1421,18 @@ class DynamicWorldWizard(QWizard):
         sim_selection_page = SimSelectionPage()
         self.addPage(sim_selection_page)
         print("Added SimSelectionPage")
-        self.addPage(WallsDesignPage(self.scene))
+        self.walls_page = WallsDesignPage(self.scene)
+        self.addPage(self.walls_page)
         print("Added WallsDesignPage")
-        self.addPage(StaticObstaclesPage(self.scene))
+        self.static_obstacles_page = StaticObstaclesPage(self.scene)
+        self.addPage(self.static_obstacles_page)
         print("Added StaticObstaclesPage")
-        self.addPage(DynamicObstaclesPage(self.scene))
+        self.dynamic_obstacles_page = DynamicObstaclesPage(self.scene)
+        self.addPage(self.dynamic_obstacles_page)
         print("Added DynamicObstaclesPage")
-        self.addPage(SaveResultsPage())
-        print("Added SaveResultsPage")
+        self.addPage(ComingSoonPage())
+        print("Added ComingSoonPage")
+
 
         sim_selection_page.simulationSelected.connect(self.initialize_world_manager)
         print("Connected simulationSelected signal")
@@ -1346,6 +1447,42 @@ class DynamicWorldWizard(QWizard):
 
         self.currentIdChanged.connect(self.update_navigation)
         print("Connected currentIdChanged signal")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        window_width = max(self.width(), 800)  # Respect minimum window width
+        nav_width = max(min(int(window_width * 0.2), 300), 200)  # 20% of window width, clamped between 200-300px
+        self.nav_list.setFixedWidth(nav_width)
+        # Scale font size: 12pt at 200px, 16pt at 300px
+        font_size = 12 + (nav_width - 200) * (16 - 12) / (300 - 200)
+        self.nav_list.setFont(QFont("Arial", int(font_size), QFont.Bold))
+        content_width = window_width - nav_width  # Width for canvas + left panel
+        canvas_width = int(content_width * 0.7)  # 70% for canvas
+        left_width = content_width - canvas_width  # Remaining for left panel
+        
+        # Update WallsDesignPage
+        if hasattr(self, 'walls_page'):
+            self.walls_page.view.setFixedWidth(canvas_width)
+            for widget in self.walls_page.findChildren(QWidget):
+                if widget.layout() and isinstance(widget.layout(), QVBoxLayout):
+                    widget.setMaximumWidth(left_width)
+                    widget.setMinimumWidth(150)  # Ensure usability
+        
+        # Update StaticObstaclesPage
+        if hasattr(self, 'static_obstacles_page'):
+            self.static_obstacles_page.view.setFixedWidth(canvas_width)
+            for widget in self.static_obstacles_page.findChildren(QWidget):
+                if widget.layout() and isinstance(widget.layout(), QVBoxLayout):
+                    widget.setMaximumWidth(left_width)
+                    widget.setMinimumWidth(150)
+        
+        # Update DynamicObstaclesPage
+        if hasattr(self, 'dynamic_obstacles_page'):
+            self.dynamic_obstacles_page.view.setFixedWidth(canvas_width)
+            for widget in self.dynamic_obstacles_page.findChildren(QWidget):
+                if widget.layout() and isinstance(widget.layout(), QVBoxLayout):
+                    widget.setMaximumWidth(left_width)
+                    widget.setMinimumWidth(150)
 
     def refresh_canvas(self, scene, wall_items, obstacle_items):
         scene.clear()
@@ -1416,7 +1553,7 @@ class DynamicWorldWizard(QWizard):
     def navigate_to_page(self, item):
         print(f"Navigating to page: {item.text()}")
         page_names = ["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
-                      "Add Dynamic Obstacles", "Save Results"]
+                    "Add Dynamic Obstacles", "Coming Soon"]
         target_index = page_names.index(item.text())
         current_index = self.pageIds().index(self.currentId())
 
