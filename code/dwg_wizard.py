@@ -134,7 +134,7 @@ class SimSelectionPage(QWizardPage):
         fortress_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
         fortress_label.setStyleSheet("color: red;")
         fortress_image_label = QLabel()
-        fortress_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "fortress.jpg")
+        fortress_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "fortress.jpeg")
         if os.path.exists(fortress_image_path):
             pixmap = QPixmap(fortress_image_path).scaled(290, 290, Qt.KeepAspectRatio)
             fortress_image_label.setPixmap(pixmap)
@@ -169,7 +169,7 @@ class SimSelectionPage(QWizardPage):
         harmonic_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
         harmonic_label.setStyleSheet("color: red;")
         harmonic_image_label = QLabel()
-        harmonic_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "harmonic.jpg")
+        harmonic_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "harmonic.png")
         if os.path.exists(harmonic_image_path):
             pixmap = QPixmap(harmonic_image_path).scaled(290, 290, Qt.KeepAspectRatio)
             harmonic_image_label.setPixmap(pixmap)
@@ -208,13 +208,13 @@ class SimSelectionPage(QWizardPage):
         isaac_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
         isaac_label.setStyleSheet("color: red;")
         isaac_image_label = QLabel()
-        isaac_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "isaacsim_gray.jpg")
+        isaac_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "intro", "isaacsim_450_gray.png")
         if os.path.exists(isaac_image_path):
-            pixmap = QPixmap(isaac_image_path).scaled(400, 400, Qt.KeepAspectRatio)
+            pixmap = QPixmap(isaac_image_path).scaled(674, 1264, Qt.KeepAspectRatio)
             isaac_image_label.setPixmap(pixmap)
         else:
             isaac_image_label.setText("Isaac Sim image not found")
-        isaac_image_label.setFixedSize(400, 400)
+        isaac_image_label.setFixedSize(550, 400)
         isaac_image_label.setAlignment(Qt.AlignCenter)
         self.isaac_button = QPushButton("Select Isaac Sim")
         self.isaac_button.setFont(QFont("Arial", 14))
@@ -904,12 +904,12 @@ class ComingSoonPage(QWizardPage):
         # Future 1
         feature1_widget = QWidget()
         feature1_layout = QVBoxLayout()
-        feature1_label = QLabel("Future 1")
+        feature1_label = QLabel("Gazebo Ionic")
         feature1_label.setAlignment(Qt.AlignCenter)
         feature1_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
         feature1_label.setStyleSheet("color: red;")
         feature1_image_label = QLabel()
-        feature1_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "future_1.jpg")
+        feature1_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "ionic.png")
         if os.path.exists(feature1_image_path):
             pixmap = QPixmap(feature1_image_path).scaled(350, 350, Qt.KeepAspectRatio)
             feature1_image_label.setPixmap(pixmap)
@@ -927,14 +927,14 @@ class ComingSoonPage(QWizardPage):
         # Future 2
         feature2_widget = QWidget()
         feature2_layout = QVBoxLayout()
-        feature2_label = QLabel("Future 2")
+        feature2_label = QLabel("Isaac Sim 4.5.0")
         feature2_label.setAlignment(Qt.AlignCenter)
         feature2_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
         feature2_label.setStyleSheet("color: red;")
         feature2_image_label = QLabel()
-        feature2_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "future_2.jpg")
+        feature2_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "isaacsim_450.png")
         if os.path.exists(feature2_image_path):
-            pixmap = QPixmap(feature2_image_path).scaled(350, 350, Qt.KeepAspectRatio)
+            pixmap = QPixmap(feature2_image_path).scaled(674, 1264, Qt.KeepAspectRatio)
             feature2_image_label.setPixmap(pixmap)
         else:
             feature2_image_label.setText("Future 2 image not found")
@@ -950,14 +950,14 @@ class ComingSoonPage(QWizardPage):
         # Future 3
         feature3_widget = QWidget()
         feature3_layout = QVBoxLayout()
-        feature3_label = QLabel("Future 3")
+        feature3_label = QLabel("Isaac Sim 5.0.0")
         feature3_label.setAlignment(Qt.AlignCenter)
         feature3_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
         feature3_label.setStyleSheet("color: red;")
         feature3_image_label = QLabel()
-        feature3_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "future_3.jpg")
+        feature3_image_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "images", "future", "isaacsim_500.png")
         if os.path.exists(feature3_image_path):
-            pixmap = QPixmap(feature3_image_path).scaled(350, 350, Qt.KeepAspectRatio)
+            pixmap = QPixmap(feature3_image_path).scaled(674, 1264, Qt.KeepAspectRatio)
             feature3_image_label.setPixmap(pixmap)
         else:
             feature3_image_label.setText("Future 3 image not found")
