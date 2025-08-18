@@ -1187,21 +1187,38 @@ class WorldManager:
             script_path = os.path.join(move_code_dir, f"{self.world_name}_moveObstacles.py")
             with open(script_path, 'w') as f:
                 f.write('#!/usr/bin/env python3\n')
-                f.write('import subprocess\n')
                 f.write('import time\n')
                 f.write('import random\n')
                 f.write('import math\n\n')
+                if self.version == "harmonic":
+                    f.write('from gz.transport13 import Node\n')
+                    f.write('from gz.msgs10.pose_pb2 import Pose\n')
+                    f.write('from gz.msgs10.boolean_pb2 import Boolean\n\n')
+                else:  # Fortress
+                    f.write('import subprocess\n\n')
                 f.write(f'prefix = "{"ign" if self.version == "fortress" else "gz"}\"\n')
                 f.write(f'reqtype_prefix = "{"ignition.msgs" if self.version == "fortress" else "gz.msgs"}\"\n')
                 f.write(f'world_name = "{self.world_name}"\n\n')
-                f.write('def set_pose(model_name, x, y, z):\n')
-                f.write('    request_str = f\'name: "{model_name}", position {{ x: {x} y: {y} z: {z} }}, orientation {{ w: 1 }}\'\n')
-                f.write('    cmd = [prefix, "service", "-s", f"/world/{world_name}/set_pose", "--reqtype", f"{reqtype_prefix}.Pose", "--reptype", f"{reqtype_prefix}.Boolean", "--timeout", "500", "--req", request_str]\n')
-                f.write('    result = subprocess.run(cmd, capture_output=True, text=True)\n')
-                f.write('    if result.returncode != 0:\n')
-                f.write('        print(f"Failed to set pose for {model_name}: {result.stderr}")\n')
-                f.write('        return False\n')
-                f.write('    return True\n\n')
+                if self.version == "harmonic":
+                    f.write('node = Node()\n\n')
+                    f.write('def set_pose(model_name, x, y, z):\n')
+                    f.write('    req = Pose()\n')
+                    f.write('    req.name = model_name\n')  # Note: In gz-msgs10, it's req.name, not req.name()
+                    f.write('    req.position.x = x\n')
+                    f.write('    req.position.y = y\n')
+                    f.write('    req.position.z = z\n')
+                    f.write('    req.orientation.w = 1.0\n')
+                    f.write('    success, rep = node.request(f"/world/{world_name}/set_pose", req, Pose, Boolean, 500)\n')
+                    f.write('    return success\n\n')
+                else:  # Fortress subprocess version (unchanged)
+                    f.write('def set_pose(model_name, x, y, z):\n')
+                    f.write('    request_str = f\'name: "{model_name}", position {{ x: {x} y: {y} z: {z} }}, orientation {{ w: 1 }}\'\n')
+                    f.write('    cmd = [prefix, "service", "-s", f"/world/{world_name}/set_pose", "--reqtype", f"{reqtype_prefix}.Pose", "--reptype", f"{reqtype_prefix}.Boolean", "--timeout", "500", "--req", request_str]\n')
+                    f.write('    result = subprocess.run(cmd, capture_output=True, text=True)\n')
+                    f.write('    if result.returncode != 0:\n')
+                    f.write('        print(f"Failed to set pose for {model_name}: {result.stderr}")\n')
+                    f.write('        return False\n')
+                    f.write('    return True\n\n')
                 f.write('motions = {}\nstates = {}\n')
                 for m in dynamic_models:
                     motion = m["properties"]["motion"]
@@ -1228,7 +1245,7 @@ class WorldManager:
                 f.write('                dx = end[0] - start[0]\n')
                 f.write('                dy = end[1] - start[1]\n')
                 f.write('                length = math.sqrt(dx**2 + dy**2)\n')
-                f.write('                if length < 0.001: continue\n')  # Skip if path is too short
+                f.write('                if length < 0.001: continue\n')
                 f.write('                unit_x = dx / length\n')
                 f.write('                unit_y = dy / length\n')
                 f.write('                new_x = state["current_pos"][0] + delta * state["direction"] * unit_x\n')
@@ -1263,7 +1280,7 @@ class WorldManager:
                 f.write('                dx = end[0] - start[0]\n')
                 f.write('                dy = end[1] - start[1]\n')
                 f.write('                length = math.sqrt(dx**2 + dy**2)\n')
-                f.write('                if length < 0.001: continue\n')  # Skip if segment is too short
+                f.write('                if length < 0.001: continue\n')
                 f.write('                state["t"] += delta / length\n')
                 f.write('                if state["t"] >= 1:\n')
                 f.write('                    state["current_segment"] = (state["current_segment"] + 1) % len(path)\n')
@@ -1279,6 +1296,7 @@ class WorldManager:
                 f.write('        print("Motion script interrupted")\n')
                 f.write('        exit(0)\n')
             os.chmod(script_path, 0o755)
+
             # Terminate any existing script process before starting a new one
             if self.script_process and self.script_process.poll() is None:
                 self.script_process.terminate()
