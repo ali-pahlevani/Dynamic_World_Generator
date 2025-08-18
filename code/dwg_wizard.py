@@ -25,9 +25,9 @@ def get_color(color_name):
 class ZoomableGraphicsView(QGraphicsView):
     def __init__(self, scene):
         super().__init__(scene)
-        self.scale_label = QLabel("1 pixel = 1 cm", self)
+        self.scale_label = QLabel("1 pixel = 10 cm", self)
         self.scale_label.setStyleSheet("background: transparent; font-size: 11pt; font-weight: bold; color: red;")
-        self.scale_label.setGeometry(10, self.height() - 38, 100, 20)
+        self.scale_label.setGeometry(10, self.height() - 38, 105, 20)
         self.is_panning = False
         self.last_pan_point = QPointF()
 
@@ -366,8 +366,14 @@ class WallsDesignPage(QWizardPage):
                     }
                     self.world_manager.add_model(wall)
                     self.wall_list.addItem(wall_name)
+                    
+                    # Calculate color and thickness
+                    color_rgb = get_color(wall["properties"]["color"])
+                    qcolor = QColor.fromRgbF(*color_rgb)
+                    thickness = max(int(wall["properties"]["width"] * 100), 2)  # Min thickness for visibility
+                    
                     line = QGraphicsLineItem(QLineF(self.start_point, end_point))
-                    line.setPen(QPen(Qt.black, 2))
+                    line.setPen(QPen(qcolor, thickness))
                     self.scene.addItem(line)
                     text = QGraphicsTextItem(wall_name)
                     text.setPos((self.start_point + end_point) / 2)
@@ -1632,8 +1638,14 @@ class DynamicWorldWizard(QWizard):
                 if model["type"] == "wall":
                     start = QPointF(model["properties"]["start"][0] * 100, model["properties"]["start"][1] * 100)
                     end = QPointF(model["properties"]["end"][0] * 100, model["properties"]["end"][1] * 100)
+                    
+                    # Calculate color and thickness
+                    color_rgb = get_color(model["properties"]["color"])
+                    qcolor = QColor.fromRgbF(*color_rgb)
+                    thickness = max(int(model["properties"]["width"] * 100), 2)  # Min thickness for visibility
+                    
                     line = QGraphicsLineItem(QLineF(start, end))
-                    line.setPen(QPen(Qt.black, 2))
+                    line.setPen(QPen(qcolor, thickness))
                     scene.addItem(line)
                     text = QGraphicsTextItem(model["name"])
                     text.setPos((start + end) / 2)
