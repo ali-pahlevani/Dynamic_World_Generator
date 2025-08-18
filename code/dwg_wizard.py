@@ -632,7 +632,8 @@ class StaticObstaclesPage(QWizardPage):
                 self.world_manager.add_model(obstacle)
                 self.obstacle_list.addItem(obstacle_name)
                 item.setPen(QPen(Qt.black, 2))
-                item.setBrush(QColor("lightgray"))
+                color_rgb = get_color(self.color_input.text())
+                item.setBrush(QColor.fromRgbF(*color_rgb))
                 self.scene.addItem(item)
                 text = QGraphicsTextItem(obstacle_name)
                 text.setPos(center)
@@ -1033,6 +1034,16 @@ class WorldManager:
         self.world_name = self.sdf_root.find("world").get("name")
         self.models = []
 
+        # Inverse color mapping to convert RGB back to color name
+        rgb_to_color = {
+            (0, 0, 0): "Black",
+            (0.5, 0.5, 0.5): "Gray",
+            (1, 1, 1): "White",
+            (1, 0, 0): "Red",
+            (0, 0, 1): "Blue",
+            (0, 1, 0): "Green"
+        }
+
         for model_elem in self.sdf_root.findall(".//model"):
             name = model_elem.get("name")
             type_elem = model_elem.find("type")
@@ -1053,7 +1064,14 @@ class WorldManager:
             properties = {}
             pose_str = model_elem.find("pose").text
             pose = [float(x) for x in pose_str.split()]
-            x, y, z, _, _, _ = pose  # Ignore orientation for obstacles
+            x, y, z, _, _, yaw = pose  # Include yaw for walls
+
+            # Parse color from <material><diffuse>
+            material = model_elem.find(".//material/diffuse")
+            color_name = "Gray"  # Default
+            if material is not None:
+                rgb = tuple(float(x) for x in material.text.split()[:3])  # Get first three values (R, G, B)
+                color_name = rgb_to_color.get(rgb, "Gray")  # Map RGB to color name, default to Gray
 
             geometry = model_elem.find(".//geometry")
             if geometry:
@@ -1062,7 +1080,6 @@ class WorldManager:
                     size = [float(s) for s in size_str.split()]
                     if model_type == "wall":
                         length, width, height = size
-                        yaw = pose[5]
                         dx = (length / 2) * math.cos(yaw)
                         dy = (length / 2) * math.sin(yaw)
                         start_x = x - dx
@@ -1074,13 +1091,13 @@ class WorldManager:
                             "end": (end_x, end_y),
                             "width": width,
                             "height": height,
-                            "color": "Gray"
+                            "color": color_name
                         }
                     else:
                         properties = {
                             "position": (x, y, z),
                             "size": size,
-                            "color": "Gray"
+                            "color": color_name
                         }
                 elif model_type == "cylinder":
                     radius = float(geometry.find("cylinder/radius").text)
@@ -1088,15 +1105,38 @@ class WorldManager:
                     properties = {
                         "position": (x, y, z),
                         "size": (radius, length),
-                        "color": "Gray"
+                        "color": color_name
                     }
                 elif model_type == "sphere":
                     radius = float(geometry.find("sphere/radius").text)
                     properties = {
                         "position": (x, y, z),
                         "size": (radius,),
-                        "color": "Gray"
+                        "color": color_name
                     }
+
+            # Parse motion if present (for dynamic obstacles)
+            motion_elem = model_elem.find(".//motion")
+            if motion_elem is not None:
+                motion = {"type": motion_elem.find("type").text}
+                velocity = motion_elem.find("velocity")
+                if velocity is not None:
+                    motion["velocity"] = float(velocity.text)
+                std = motion_elem.find("std")
+                if std is not None:
+                    motion["std"] = float(std.text)
+                if motion["type"] in ["linear", "polygon"]:
+                    path = []
+                    for point_elem in motion_elem.findall("point"):
+                        x = float(point_elem.find("x").text)
+                        y = float(point_elem.find("y").text)
+                        path.append((x, y))
+                    motion["path"] = path
+                elif motion["type"] == "elliptical":
+                    motion["semi_major"] = float(motion_elem.find("semi_major").text)
+                    motion["semi_minor"] = float(motion_elem.find("semi_minor").text)
+                    motion["angle"] = float(motion_elem.find("angle").text)
+                properties["motion"] = motion
 
             self.models.append({
                 "name": name,
@@ -1618,7 +1658,8 @@ class DynamicWorldWizard(QWizard):
                         rect_pixels = QRectF(center.x() - radius_pixels, center.y() - radius_pixels, 2 * radius_pixels, 2 * radius_pixels)
                         item = QGraphicsEllipseItem(rect_pixels)
                     item.setPen(QPen(Qt.black, 2))
-                    item.setBrush(QColor("lightgray"))
+                    color_rgb = get_color(model["properties"]["color"])
+                    item.setBrush(QColor.fromRgbF(*color_rgb))
                     scene.addItem(item)
                     text = QGraphicsTextItem(model["name"])
                     text.setPos(center)
