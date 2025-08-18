@@ -1428,10 +1428,40 @@ class WorldManager:
                     <material>
                         <diffuse>{color_rgb[0]} {color_rgb[1]} {color_rgb[2]} 1</diffuse>
                     </material>
-                </visual>
-            </link>
+                </visual>"""
+        if not static_str == "true":  # Only for dynamic models
+            # Calculate mass and inertia (assume density=1000 kg/m^3 for realism)
+            density = 1000.0
+            if model_type in ["wall", "box"]:
+                w, l, h = map(float, size_str.split())
+                mass = density * w * l * h
+                ixx = mass / 12.0 * (l**2 + h**2)
+                iyy = mass / 12.0 * (w**2 + h**2)
+                izz = mass / 12.0 * (w**2 + l**2)
+            elif model_type == "cylinder":
+                r, h = map(float, size_str.split())
+                mass = density * math.pi * r**2 * h
+                ixx = mass / 12.0 * (3 * r**2 + h**2)
+                iyy = ixx
+                izz = mass / 2.0 * r**2
+            elif model_type == "sphere":
+                r = float(size_str)
+                mass = density * (4/3) * math.pi * r**3
+                ixx = (2/5) * mass * r**2
+                iyy = ixx
+                izz = ixx
+            inertial_str = f"""<inertial>
+                <mass>{mass:.6f}</mass>
+                <inertia>
+                    <ixx>{ixx:.6f}</ixx><ixy>0</ixy><ixz>0</ixz>
+                    <iyy>{iyy:.6f}</iyy><iyz>0</iyz>
+                    <izz>{izz:.6f}</izz>
+                </inertia>
+            </inertial>"""
+            sdf += inertial_str
+            sdf += "<gravity>false</gravity>"
+        sdf += """</link>
         </model>"""
-
         if for_service:
             sdf = f"""<sdf version='{self.sdf_version}'>{sdf}</sdf>"""
         return sdf
