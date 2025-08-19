@@ -275,6 +275,7 @@ class WallsDesignPage(QWizardPage):
         self.registerField("wall_list", self)
         self.world_manager = None
         self.scene = scene
+        self.wall_items = {}
 
         layout = QHBoxLayout()
 
@@ -365,7 +366,19 @@ class WallsDesignPage(QWizardPage):
                     }
                     self.world_manager.add_model(wall)
                     self.wall_list.addItem(wall_name)
-                    self.wizard().refresh_canvas(self.scene)
+                    
+                    # Calculate color and thickness
+                    color_rgb = get_color(wall["properties"]["color"])
+                    qcolor = QColor.fromRgbF(*color_rgb)
+                    thickness = max(int(wall["properties"]["width"] * 100), 2)  # Min thickness for visibility
+                    
+                    line = QGraphicsLineItem(QLineF(self.start_point, end_point))
+                    line.setPen(QPen(qcolor, thickness))
+                    self.scene.addItem(line)
+                    text = QGraphicsTextItem(wall_name)
+                    text.setPos((self.start_point + end_point) / 2)
+                    self.scene.addItem(text)
+                    self.wall_items[wall_name] = (line, text)
                     del self.start_point
                 return True
         return super().eventFilter(obj, event)
@@ -400,7 +413,13 @@ class WallsDesignPage(QWizardPage):
             self.world_manager.load_world(world_name)
 
             self.wall_list.clear()
-            self.wizard().refresh_canvas(self.scene)
+            self.scene.clear()
+            grid_spacing = 10
+            for x in range(-1000, 1000, grid_spacing):
+                self.scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
+            for y in range(-1000, 1000, grid_spacing):
+                self.scene.addLine(-1000, y, 1000, y, QPen(QColor("lightgray")))
+            self.wall_items = {}
             QMessageBox.information(self, "Success", f"Created and loaded new world: {world_name}")
             self.completeChanged.emit()
         except Exception as e:
@@ -417,7 +436,7 @@ class WallsDesignPage(QWizardPage):
         try:
             self.world_manager.load_world(world_name)
             self.wall_list.clear()
-            self.wizard().refresh_canvas(self.scene)
+            self.wizard().refresh_canvas(self.scene, self.wall_items, {})  # Refresh with all models
             for model in self.world_manager.models:
                 if model["type"] == "wall":
                     self.wall_list.addItem(model["name"])
@@ -435,16 +454,20 @@ class WallsDesignPage(QWizardPage):
         selected = self.wall_list.currentItem()
         if selected:
             wall_name = selected.text()
-            if wall_name in self.wizard().wall_items:
-                line, text = self.wizard().wall_items[wall_name]
+            if wall_name in self.wall_items:
+                line, text = self.wall_items[wall_name]
                 self.scene.removeItem(line)
                 self.scene.removeItem(text)
-                del self.wizard().wall_items[wall_name]
+                del self.wall_items[wall_name]
             for model in self.world_manager.models:
                 if model["name"] == wall_name:
                     model["status"] = "removed"
                     break
             self.wall_list.takeItem(self.wall_list.row(selected))
+            for item in self.scene.items():
+                if isinstance(item, QGraphicsLineItem):
+                    if item.pen().color() != QColor("lightgray"):
+                        print(f"Remaining wall line: {item.line()}")
 
     def apply_changes(self):
         if not self.world_manager:
@@ -452,7 +475,6 @@ class WallsDesignPage(QWizardPage):
             return
         try:
             self.world_manager.apply_changes()
-            self.wizard().refresh_canvas(self.scene)
             QMessageBox.information(self, "Success", "Changes applied successfully.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
@@ -466,6 +488,7 @@ class StaticObstaclesPage(QWizardPage):
         self.setTitle("Add Static Obstacles")
         self.world_manager = None
         self.scene = scene
+        self.obstacle_items = {}
 
         layout = QHBoxLayout()
 
@@ -536,7 +559,7 @@ class StaticObstaclesPage(QWizardPage):
 
     def refresh_obstacles(self):
         self.obstacle_list.clear()
-        self.wizard().refresh_canvas(self.scene)
+        self.wizard().refresh_canvas(self.scene, {}, self.obstacle_items)  # Refresh with all models
         for model in self.world_manager.models:
             if model["type"] in ["box", "cylinder", "sphere"]:
                 self.obstacle_list.addItem(model["name"])
@@ -574,15 +597,28 @@ class StaticObstaclesPage(QWizardPage):
                     W = float(self.width_input.text() or 0.1)
                     L = float(self.length_input.text() or 0.1)
                     H = float(self.height_input.text() or 1.0)
+                    half_width_pixels = (W / 2) * 100
+                    half_length_pixels = (L / 2) * 100
+                    rounded_half_width_pixels = round(half_width_pixels / 10) * 10
+                    rounded_half_length_pixels = round(half_length_pixels / 10) * 10
+                    rect_pixels = QRectF(center.x() - rounded_half_width_pixels, center.y() - rounded_half_length_pixels,
+                                         2 * rounded_half_width_pixels, 2 * rounded_half_length_pixels)
+                    item = QGraphicsRectItem(rect_pixels)
                     size_m = (W, L, H)
                     position_z = H / 2
                 elif obstacle_type == "cylinder":
                     R = float(self.radius_input.text() or 0.5)
                     H = float(self.height_input.text() or 1.0)
+                    radius_pixels = R * 100
+                    rect_pixels = QRectF(center.x() - radius_pixels, center.y() - radius_pixels, 2 * radius_pixels, 2 * radius_pixels)
+                    item = QGraphicsEllipseItem(rect_pixels)
                     size_m = (R, H)
                     position_z = H / 2
                 elif obstacle_type == "sphere":
                     R = float(self.radius_input.text() or 0.5)
+                    radius_pixels = R * 100
+                    rect_pixels = QRectF(center.x() - radius_pixels, center.y() - radius_pixels, 2 * radius_pixels, 2 * radius_pixels)
+                    item = QGraphicsEllipseItem(rect_pixels)
                     size_m = (R,)
                     position_z = R
                 color = self.color_input.text() or "Gray"
@@ -601,7 +637,14 @@ class StaticObstaclesPage(QWizardPage):
                 }
                 self.world_manager.add_model(obstacle)
                 self.obstacle_list.addItem(obstacle_name)
-                self.wizard().refresh_canvas(self.scene)
+                item.setPen(QPen(Qt.black, 2))
+                color_rgb = get_color(self.color_input.text())
+                item.setBrush(QColor.fromRgbF(*color_rgb))
+                self.scene.addItem(item)
+                text = QGraphicsTextItem(obstacle_name)
+                text.setPos(center)
+                self.scene.addItem(text)
+                self.obstacle_items[obstacle_name] = (item, text)
             except ValueError:
                 QMessageBox.warning(self, "Invalid Input", "Please enter valid numeric values for dimensions.")
             return True
@@ -614,15 +657,11 @@ class StaticObstaclesPage(QWizardPage):
         selected = self.obstacle_list.currentItem()
         if selected:
             obstacle_name = selected.text()
-            if obstacle_name in self.wizard().obstacle_items:
-                item, text = self.wizard().obstacle_items[obstacle_name]
+            if obstacle_name in self.obstacle_items:
+                item, text = self.obstacle_items[obstacle_name]
                 self.scene.removeItem(item)
                 self.scene.removeItem(text)
-                del self.wizard().obstacle_items[obstacle_name]
-            if obstacle_name in self.wizard().path_items:
-                for path_item in self.wizard().path_items[obstacle_name]:
-                    self.scene.removeItem(path_item)
-                del self.wizard().path_items[obstacle_name]
+                del self.obstacle_items[obstacle_name]
             for model in self.world_manager.models:
                 if model["name"] == obstacle_name:
                     model["status"] = "removed"
@@ -635,7 +674,6 @@ class StaticObstaclesPage(QWizardPage):
             return
         try:
             self.world_manager.apply_changes()
-            self.wizard().refresh_canvas(self.scene)
             QMessageBox.information(self, "Success", "Changes applied successfully.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
@@ -703,6 +741,7 @@ class DynamicObstaclesPage(QWizardPage):
 
         self.current_obstacle = None
         self.current_motion_type = None
+        self.path_items = {}  # obstacle_name: list of graphics items
         self.points = []
         self.clicking_enabled = False
 
@@ -714,11 +753,10 @@ class DynamicObstaclesPage(QWizardPage):
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
             return
+        static_page = self.wizard().page(3)  # Assuming StaticObstaclesPage is the 4th page (index 3)
         self.obstacle_list.clear()
-        for model in self.world_manager.models:
-            if model["type"] in ["box", "cylinder", "sphere"]:
-                self.obstacle_list.addItem(model["name"])
-        self.wizard().refresh_canvas(self.scene)
+        for i in range(static_page.obstacle_list.count()):
+            self.obstacle_list.addItem(static_page.obstacle_list.item(i).text())
 
     def update_motion_type(self, text):
         self.current_motion_type = text.lower()
@@ -729,35 +767,9 @@ class DynamicObstaclesPage(QWizardPage):
 
     def select_obstacle(self, item):
         self.current_obstacle = item.text()
-        model = next((m for m in self.world_manager.models if m["name"] == self.current_obstacle), None)
-        if model and "motion" in model["properties"]:
-            motion = model["properties"]["motion"]
-            self.motion_type_combo.blockSignals(True)
-            self.motion_type_combo.setCurrentText(motion["type"].capitalize())
-            self.motion_type_combo.blockSignals(False)
-            self.current_motion_type = motion["type"]
-            self.velocity_input.setText(str(motion["velocity"]))
-            self.std_input.setText(str(motion["std"]))
-            if motion["type"] == "elliptical":
-                self.semi_major_input.setText(str(motion["semi_major"]))
-                self.semi_minor_input.setText(str(motion["semi_minor"]))
-            if motion["type"] in ["linear", "polygon"]:
-                self.points = [QPointF(x * 100, y * 100) for x, y in motion["path"]]
-            elif motion["type"] == "elliptical":
-                center_m = model["properties"]["position"][:2]
-                center = QPointF(center_m[0] * 100, center_m[1] * 100)
-                angle = motion["angle"]
-                dx = motion["semi_major"] * 100 * math.cos(angle)
-                dy = motion["semi_major"] * 100 * math.sin(angle)
-                self.points = [center + QPointF(dx, dy)]
-            self.draw_path(close_polygon=(motion["type"] == "polygon"))
-        else:
-            self.clear_path()
-            self.points = []
-            self.velocity_input.clear()
-            self.std_input.clear()
-            self.semi_major_input.clear()
-            self.semi_minor_input.clear()
+        self.clear_path()
+        self.points = []
+        self.clicking_enabled = False
 
     def start_path(self):
         if self.current_obstacle and self.current_motion_type:
@@ -794,10 +806,10 @@ class DynamicObstaclesPage(QWizardPage):
         return QPointF(x, y)
 
     def clear_path(self):
-        if self.current_obstacle in self.wizard().path_items:
-            for item in self.wizard().path_items[self.current_obstacle]:
+        if self.current_obstacle in self.path_items:
+            for item in self.path_items[self.current_obstacle]:
                 self.scene.removeItem(item)
-            del self.wizard().path_items[self.current_obstacle]
+            del self.path_items[self.current_obstacle]
 
     def draw_path(self, close_polygon=False):
         self.clear_path()
@@ -837,7 +849,7 @@ class DynamicObstaclesPage(QWizardPage):
                 line.setPen(QPen(QColor(color), 2))
                 self.scene.addItem(line)
                 items.append(line)
-        self.wizard().path_items[self.current_obstacle] = items
+        self.path_items[self.current_obstacle] = items
 
     def store_motion(self):
         if not self.current_obstacle or not self.current_motion_type or not self.points:
@@ -864,7 +876,10 @@ class DynamicObstaclesPage(QWizardPage):
             motion["semi_minor"] = semi_minor
             motion["angle"] = angle
         model["properties"]["motion"] = motion
-        model["status"] = "updated" if model.get("status") else "new"
+        if "status" in model:
+            model["status"] = "updated"
+        else:
+            model["status"] = "new"
 
     def apply_changes(self):
         if not self.world_manager:
@@ -872,7 +887,6 @@ class DynamicObstaclesPage(QWizardPage):
             return
         try:
             self.world_manager.apply_changes()
-            self.wizard().refresh_canvas(self.scene)
             QMessageBox.information(self, "Success", "Changes applied successfully.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
@@ -1332,19 +1346,6 @@ class WorldManager:
                 f.write('        exit(0)\n')
             os.chmod(script_path, 0o755)
 
-            # Generate launch script for direct running with motion
-            launch_path = os.path.join(move_code_dir, f"{self.world_name}_launch.sh")
-            with open(launch_path, 'w') as f:
-                f.write('#!/bin/bash\n')
-                if self.version == "fortress":
-                    f.write(f'ign gazebo {self.world_path} &\n')
-                else:
-                    f.write(f'gz sim {self.world_path} &\n')
-                f.write('sleep 2\n')
-                f.write(f'python3 {script_path} &\n')
-                f.write('wait\n')
-            os.chmod(launch_path, 0o755)
-
             # Terminate any existing script process before starting a new one
             if self.script_process and self.script_process.poll() is None:
                 self.script_process.terminate()
@@ -1505,22 +1506,8 @@ class WorldManager:
             </inertial>"""
             sdf += inertial_str
             sdf += "<gravity>false</gravity>"
-        sdf += """</link>"""
-        if "motion" in props:
-            motion = props["motion"]
-            sdf += "<motion>"
-            sdf += f"<type>{motion['type']}</type>"
-            sdf += f"<velocity>{motion['velocity']:.6f}</velocity>"
-            sdf += f"<std>{motion['std']:.6f}</std>"
-            if "path" in motion:
-                for p in motion["path"]:
-                    sdf += f"<point><x>{p[0]:.6f}</x><y>{p[1]:.6f}</y></point>"
-            if "semi_major" in motion:
-                sdf += f"<semi_major>{motion['semi_major']:.6f}</semi_major>"
-                sdf += f"<semi_minor>{motion['semi_minor']:.6f}</semi_minor>"
-                sdf += f"<angle>{motion['angle']:.6f}</angle>"
-            sdf += "</motion>"
-        sdf += "</model>"
+        sdf += """</link>
+        </model>"""
         if for_service:
             sdf = f"""<sdf version='{self.sdf_version}'>{sdf}</sdf>"""
         return sdf
@@ -1541,9 +1528,6 @@ class DynamicWorldWizard(QWizard):
 
         self.world_manager = None
         self.scene = QGraphicsScene()
-        self.wall_items = {}
-        self.obstacle_items = {}
-        self.path_items = {}
 
         self.nav_list = QListWidget()
         self.nav_list.addItems(["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
@@ -1640,33 +1624,33 @@ class DynamicWorldWizard(QWizard):
                     widget.setMaximumWidth(left_width)
                     widget.setMinimumWidth(150)
 
-    def refresh_canvas(self, scene):
+    def refresh_canvas(self, scene, wall_items, obstacle_items):
         scene.clear()
         grid_spacing = 10
         for x in range(-1000, 1000, grid_spacing):
             scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
         for y in range(-1000, 1000, grid_spacing):
             scene.addLine(-1000, y, 1000, y, QPen(QColor("lightgray")))
-        self.wall_items.clear()
-        self.obstacle_items.clear()
-        self.path_items.clear()
+        wall_items.clear()
+        obstacle_items.clear()
         if self.world_manager:
             for model in self.world_manager.models:
-                if model.get("status") == "removed":
-                    continue
                 if model["type"] == "wall":
                     start = QPointF(model["properties"]["start"][0] * 100, model["properties"]["start"][1] * 100)
                     end = QPointF(model["properties"]["end"][0] * 100, model["properties"]["end"][1] * 100)
+                    
+                    # Calculate color and thickness
                     color_rgb = get_color(model["properties"]["color"])
                     qcolor = QColor.fromRgbF(*color_rgb)
-                    thickness = max(int(model["properties"]["width"] * 100), 2)
+                    thickness = max(int(model["properties"]["width"] * 100), 2)  # Min thickness for visibility
+                    
                     line = QGraphicsLineItem(QLineF(start, end))
                     line.setPen(QPen(qcolor, thickness))
                     scene.addItem(line)
                     text = QGraphicsTextItem(model["name"])
                     text.setPos((start + end) / 2)
                     scene.addItem(text)
-                    self.wall_items[model["name"]] = (line, text)
+                    wall_items[model["name"]] = (line, text)
                 elif model["type"] in ["box", "cylinder", "sphere"]:
                     position = model["properties"]["position"]
                     size = model["properties"]["size"]
@@ -1678,7 +1662,7 @@ class DynamicWorldWizard(QWizard):
                         rounded_half_width_pixels = round(half_width_pixels / 10) * 10
                         rounded_half_length_pixels = round(half_length_pixels / 10) * 10
                         rect_pixels = QRectF(center.x() - rounded_half_width_pixels, center.y() - rounded_half_length_pixels,
-                                             2 * rounded_half_width_pixels, 2 * rounded_half_length_pixels)
+                                            2 * rounded_half_width_pixels, 2 * rounded_half_length_pixels)
                         item = QGraphicsRectItem(rect_pixels)
                     else:  # cylinder or sphere
                         R = size[0]
@@ -1692,39 +1676,7 @@ class DynamicWorldWizard(QWizard):
                     text = QGraphicsTextItem(model["name"])
                     text.setPos(center)
                     scene.addItem(text)
-                    self.obstacle_items[model["name"]] = (item, text)
-                motion = model["properties"].get("motion")
-                if motion:
-                    type_ = motion["type"]
-                    color = {"linear": "red", "elliptical": "green", "polygon": "blue"}[type_]
-                    items = []
-                    if type_ == "linear":
-                        p1 = QPointF(motion["path"][0][0] * 100, motion["path"][0][1] * 100)
-                        p2 = QPointF(motion["path"][1][0] * 100, motion["path"][1][1] * 100)
-                        line = QGraphicsLineItem(QLineF(p1, p2))
-                        line.setPen(QPen(QColor(color), 2))
-                        scene.addItem(line)
-                        items.append(line)
-                    elif type_ == "elliptical":
-                        center_m = model["properties"]["position"][:2]
-                        center = QPointF(center_m[0] * 100, center_m[1] * 100)
-                        semi_major = motion["semi_major"]
-                        semi_minor = motion["semi_minor"]
-                        angle = motion["angle"]
-                        ellipse = QGraphicsEllipseItem(QRectF(-semi_major * 100, -semi_minor * 100, 2 * semi_major * 100, 2 * semi_minor * 100))
-                        ellipse.setPos(center)
-                        ellipse.setRotation(math.degrees(angle))
-                        ellipse.setPen(QPen(QColor(color), 2))
-                        scene.addItem(ellipse)
-                        items.append(ellipse)
-                    elif type_ == "polygon":
-                        points = [QPointF(p[0] * 100, p[1] * 100) for p in motion["path"]]
-                        for i in range(len(points)):
-                            line = QGraphicsLineItem(QLineF(points[i], points[(i + 1) % len(points)]))
-                            line.setPen(QPen(QColor(color), 2))
-                            scene.addItem(line)
-                            items.append(line)
-                    self.path_items[model["name"]] = items
+                    obstacle_items[model["name"]] = (item, text)
 
     def closeEvent(self, event):
         print("Closing DynamicWorldWizard")
