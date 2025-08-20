@@ -355,8 +355,8 @@ class WallsDesignPage(QWizardPage):
                         "name": wall_name,
                         "type": "wall",
                         "properties": {
-                            "start": (self.start_point.x() / 100, self.start_point.y() / 100),
-                            "end": (end_point.x() / 100, end_point.y() / 100),
+                            "start": (self.start_point.x() / 100, -self.start_point.y() / 100),
+                            "end": (end_point.x() / 100, -end_point.y() / 100),
                             "width": float(self.width_input.text() or 0.1),
                             "height": float(self.height_input.text() or 1.0),
                             "color": self.color_input.text() or "Gray"
@@ -588,7 +588,7 @@ class StaticObstaclesPage(QWizardPage):
                 color = self.color_input.text() or "Gray"
                 obstacle_name = f"{obstacle_type}_{len(self.world_manager.models) + 1}"
                 x_m = center.x() / 100
-                y_m = center.y() / 100
+                y_m = -center.y() / 100
                 obstacle = {
                     "name": obstacle_name,
                     "type": obstacle_type,
@@ -713,7 +713,7 @@ class DynamicObstaclesPage(QWizardPage):
 
         self.motion_type_combo.currentTextChanged.connect(self.update_motion_type)
         self.obstacle_list.itemClicked.connect(self.select_obstacle)
-        
+
     def initializePage(self):
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
@@ -750,10 +750,10 @@ class DynamicObstaclesPage(QWizardPage):
                 self.points = [QPointF(x * 100, y * 100) for x, y in motion["path"]]
             elif motion["type"] == "elliptical":
                 center_m = model["properties"]["position"][:2]
-                center = QPointF(center_m[0] * 100, center_m[1] * 100)
+                center = QPointF(center_m[0] * 100, -center_m[1] * 100)
                 angle = motion["angle"]
                 dx = motion["semi_major"] * 100 * math.cos(angle)
-                dy = motion["semi_major"] * 100 * math.sin(angle)
+                dy = -motion["semi_major"] * 100 * math.sin(angle)
                 self.points = [center + QPointF(dx, dy)]
             self.draw_path(close_polygon=(motion["type"] == "polygon"))
         else:
@@ -822,12 +822,12 @@ class DynamicObstaclesPage(QWizardPage):
                 return
             model = next(m for m in self.world_manager.models if m["name"] == self.current_obstacle)
             center_m = model["properties"]["position"][:2]
-            center = QPointF(center_m[0] * 100, center_m[1] * 100)
+            center = QPointF(center_m[0] * 100, -center_m[1] * 100)
             direction = self.points[0] - center
-            angle = math.degrees(math.atan2(direction.y(), direction.x()))
+            angle = math.degrees(math.atan2(-direction.y(), direction.x()))
             ellipse = QGraphicsEllipseItem(QRectF(-semi_major * 100, -semi_minor * 100, 2 * semi_major * 100, 2 * semi_minor * 100))
             ellipse.setPos(center)
-            ellipse.setRotation(angle)
+            ellipse.setRotation(-angle)
             ellipse.setPen(QPen(QColor(color), 2))
             self.scene.addItem(ellipse)
             items.append(ellipse)
@@ -856,15 +856,15 @@ class DynamicObstaclesPage(QWizardPage):
         model = next(m for m in self.world_manager.models if m["name"] == self.current_obstacle)
         motion = {"type": self.current_motion_type, "velocity": velocity, "std": std}
         if self.current_motion_type in ["linear", "polygon"]:
-            path_m = [(p.x() / 100, p.y() / 100) for p in self.points]
+            path_m = [(p.x() / 100, -p.y() / 100) for p in self.points]
             motion["path"] = path_m
         elif self.current_motion_type == "elliptical":
             semi_major = float(self.semi_major_input.text() or 1.0)
             semi_minor = float(self.semi_minor_input.text() or 0.5)
             center_m = model["properties"]["position"][:2]
-            center = QPointF(center_m[0] * 100, center_m[1] * 100)
+            center = QPointF(center_m[0] * 100, -center_m[1] * 100)
             direction = self.points[0] - center
-            angle = math.atan2(direction.y(), direction.x())
+            angle = math.atan2(-direction.y(), direction.x())
             motion["semi_major"] = semi_major
             motion["semi_minor"] = semi_minor
             motion["angle"] = angle
@@ -1043,6 +1043,8 @@ class WorldManager:
 
         for model_elem in self.sdf_root.findall(".//model"):
             name = model_elem.get("name")
+            motion_elem = model_elem.find(".//motion")
+            print(f"Loading model: {name}, Motion: {motion_elem is not None}")
             type_elem = model_elem.find("type")
             model_type = type_elem.text if type_elem is not None else None
 
@@ -1061,7 +1063,7 @@ class WorldManager:
             properties = {}
             pose_str = model_elem.find("pose").text
             pose = [float(x) for x in pose_str.split()]
-            x, y, z, _, _, yaw = pose  # Include yaw for walls
+            x, y, z, _, _, yaw = pose
 
             # Parse color from <material><diffuse>
             material = model_elem.find(".//material/diffuse")
@@ -1083,6 +1085,7 @@ class WorldManager:
                         start_y = y - dy
                         end_x = x + dx
                         end_y = y + dy
+
                         properties = {
                             "start": (start_x, start_y),
                             "end": (end_x, end_y),
@@ -1143,6 +1146,10 @@ class WorldManager:
             })
 
     def add_model(self, model):
+        for existing_model in self.models:
+            if existing_model["name"] == model["name"]:
+                existing_model.update(model)
+                return
         self.models.append(model)
 
     def apply_changes(self):
@@ -1196,6 +1203,8 @@ class WorldManager:
                 time.sleep(1)
                 sdf_snippet_file = self.generate_model_sdf(model, for_service=False)
                 model_elem = ET.fromstring(sdf_snippet_file)
+                for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
+                    self.sdf_root.find("world").remove(elem)
                 self.sdf_root.find("world").append(model_elem)
                 self.save_sdf(self.world_path)
             elif model["status"] == "removed":
@@ -1647,6 +1656,7 @@ class DynamicWorldWizard(QWizard):
 
     def refresh_canvas(self, scene):
         scene.clear()
+        self.path_items.clear()  # Add this to ensure path_items is reset
         grid_spacing = 10
         for x in range(-1000, 1000, grid_spacing):
             scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
@@ -1660,8 +1670,8 @@ class DynamicWorldWizard(QWizard):
                 if model.get("status") == "removed":
                     continue
                 if model["type"] == "wall":
-                    start = QPointF(model["properties"]["start"][0] * 100, model["properties"]["start"][1] * 100)
-                    end = QPointF(model["properties"]["end"][0] * 100, model["properties"]["end"][1] * 100)
+                    start = QPointF(model["properties"]["start"][0] * 100, -model["properties"]["start"][1] * 100)
+                    end = QPointF(model["properties"]["end"][0] * 100, -model["properties"]["end"][1] * 100)
                     color_rgb = get_color(model["properties"]["color"])
                     qcolor = QColor.fromRgbF(*color_rgb)
                     thickness = max(int(model["properties"]["width"] * 100), 2)
@@ -1675,7 +1685,7 @@ class DynamicWorldWizard(QWizard):
                 elif model["type"] in ["box", "cylinder", "sphere"]:
                     position = model["properties"]["position"]
                     size = model["properties"]["size"]
-                    center = QPointF(position[0] * 100, position[1] * 100)
+                    center = QPointF(position[0] * 100, -position[1] * 100)
                     if model["type"] == "box":
                         W, L, _ = size
                         half_width_pixels = (W / 2) * 100
@@ -1704,26 +1714,26 @@ class DynamicWorldWizard(QWizard):
                     color = {"linear": "red", "elliptical": "green", "polygon": "blue"}[type_]
                     items = []
                     if type_ == "linear":
-                        p1 = QPointF(motion["path"][0][0] * 100, motion["path"][0][1] * 100)
-                        p2 = QPointF(motion["path"][1][0] * 100, motion["path"][1][1] * 100)
+                        p1 = QPointF(motion["path"][0][0] * 100, -motion["path"][0][1] * 100)
+                        p2 = QPointF(motion["path"][1][0] * 100, -motion["path"][1][1] * 100)
                         line = QGraphicsLineItem(QLineF(p1, p2))
                         line.setPen(QPen(QColor(color), 2))
                         scene.addItem(line)
                         items.append(line)
                     elif type_ == "elliptical":
                         center_m = model["properties"]["position"][:2]
-                        center = QPointF(center_m[0] * 100, center_m[1] * 100)
+                        center = QPointF(center_m[0] * 100, -center_m[1] * 100)
                         semi_major = motion["semi_major"]
                         semi_minor = motion["semi_minor"]
                         angle = motion["angle"]
                         ellipse = QGraphicsEllipseItem(QRectF(-semi_major * 100, -semi_minor * 100, 2 * semi_major * 100, 2 * semi_minor * 100))
                         ellipse.setPos(center)
-                        ellipse.setRotation(math.degrees(angle))
+                        ellipse.setRotation(-math.degrees(angle))
                         ellipse.setPen(QPen(QColor(color), 2))
                         scene.addItem(ellipse)
                         items.append(ellipse)
                     elif type_ == "polygon":
-                        points = [QPointF(p[0] * 100, p[1] * 100) for p in motion["path"]]
+                        points = [QPointF(p[0] * 100, -p[1] * 100) for p in motion["path"]]
                         for i in range(len(points)):
                             line = QGraphicsLineItem(QLineF(points[i], points[(i + 1) % len(points)]))
                             line.setPen(QPen(QColor(color), 2))
@@ -1746,9 +1756,10 @@ class DynamicWorldWizard(QWizard):
 
     def update_navigation(self, page_id):
         print(f"Updating navigation to page_id={page_id}")
-        page_index = self.pageIds().index(page_id)
-        if self.nav_list.currentRow() != page_index:
-            self.nav_list.setCurrentRow(page_index)
+        if page_id != -1:
+            page_index = self.pageIds().index(page_id)
+            if self.nav_list.currentRow() != page_index:
+                self.nav_list.setCurrentRow(page_index)
 
     def navigate_to_page(self, item):
         print(f"Navigating to page: {item.text()}")
