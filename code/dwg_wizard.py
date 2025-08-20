@@ -706,9 +706,14 @@ class DynamicObstaclesPage(QWizardPage):
         self.points = []
         self.clicking_enabled = False
 
+        # Initialize motion type and input field states after widget creation
+        self.current_motion_type = self.motion_type_combo.currentText().lower()
+        self.semi_major_input.setEnabled(self.current_motion_type == "elliptical")
+        self.semi_minor_input.setEnabled(self.current_motion_type == "elliptical")
+
         self.motion_type_combo.currentTextChanged.connect(self.update_motion_type)
         self.obstacle_list.itemClicked.connect(self.select_obstacle)
-
+        
     def initializePage(self):
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
@@ -794,7 +799,7 @@ class DynamicObstaclesPage(QWizardPage):
         return QPointF(x, y)
 
     def clear_path(self):
-        if self.current_obstacle in self.wizard().path_items:
+        if self.current_obstacle and self.current_obstacle in self.wizard().path_items:
             for item in self.wizard().path_items[self.current_obstacle]:
                 self.scene.removeItem(item)
             del self.wizard().path_items[self.current_obstacle]
