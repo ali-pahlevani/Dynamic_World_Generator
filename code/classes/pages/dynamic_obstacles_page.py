@@ -1,12 +1,12 @@
-from PyQt5.QtWidgets import QWizardPage, QHBoxLayout, QVBoxLayout, QComboBox, QListWidget, QPushButton, QLineEdit, QMessageBox, QWidget
+from PyQt5.QtWidgets import QWizardPage, QHBoxLayout, QVBoxLayout, QComboBox, QListWidget, QPushButton, QLineEdit, QMessageBox, QGraphicsLineItem, QGraphicsEllipseItem, QWidget
 from PyQt5.QtCore import Qt, QEvent, QPointF, QLineF, QRectF
 from PyQt5.QtGui import QPen, QColor
-from PyQt5.QtWidgets import QWizardPage, QHBoxLayout, QVBoxLayout, QComboBox, QListWidget, QPushButton, QLineEdit, QMessageBox, QGraphicsLineItem, QGraphicsEllipseItem
 from classes.zoomable_graphics_view import ZoomableGraphicsView
 import math
 
 class DynamicObstaclesPage(QWizardPage):
     def __init__(self, scene):
+        # Initialize wizard page with title and layout
         super().__init__()
         self.setTitle("Add Dynamic Obstacles")
         self.world_manager = None
@@ -31,8 +31,8 @@ class DynamicObstaclesPage(QWizardPage):
         self.apply_button = QPushButton("Apply and Preview")
         self.apply_button.clicked.connect(self.apply_changes)
 
+        # Setup main layout with left panel and canvas
         layout = QHBoxLayout()
-
         left_widget = QWidget()
         left_layout = QVBoxLayout()
         left_layout.addWidget(self.motion_type_combo)
@@ -46,37 +46,38 @@ class DynamicObstaclesPage(QWizardPage):
         left_layout.addWidget(self.apply_button)
         left_widget.setLayout(left_layout)
 
+        # Setup zoomable canvas
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
 
-        # Set size constraints: canvas at 70% of content width, left panel takes the rest
-        window_width = 1500  # Default wizard width
-        canvas_width = int(window_width * 0.7)  # 70% of window width
-        self.view.setMinimumWidth(int(800 * 0.7))  # Minimum canvas width (70% of 800px window)
-        self.view.setMaximumWidth(canvas_width)  # Initial canvas width
-        left_widget.setMinimumWidth(150)  # Minimum left panel width for usability
-        left_widget.setMaximumWidth(window_width - canvas_width - 260)  # Initial left panel width
+        # Set size constraints for canvas and left panel
+        window_width = 1500
+        canvas_width = int(window_width * 0.7)
+        self.view.setMinimumWidth(int(800 * 0.7))
+        self.view.setMaximumWidth(canvas_width)
+        left_widget.setMinimumWidth(150)
+        left_widget.setMaximumWidth(window_width - canvas_width - 260)
 
         layout.addWidget(left_widget)
         layout.addWidget(self.view)
-
         self.setLayout(layout)
 
+        # Initialize path tracking and input states
         self.current_obstacle = None
         self.current_motion_type = None
         self.points = []
         self.clicking_enabled = False
-
-        # Initialize motion type and input field states after widget creation
         self.current_motion_type = self.motion_type_combo.currentText().lower()
         self.semi_major_input.setEnabled(self.current_motion_type == "elliptical")
         self.semi_minor_input.setEnabled(self.current_motion_type == "elliptical")
 
+        # Connect signals for motion type and obstacle selection
         self.motion_type_combo.currentTextChanged.connect(self.update_motion_type)
         self.obstacle_list.itemClicked.connect(self.select_obstacle)
 
     def initializePage(self):
+        # Set world manager and populate obstacle list
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
@@ -88,6 +89,7 @@ class DynamicObstaclesPage(QWizardPage):
         self.wizard().refresh_canvas(self.scene)
 
     def update_motion_type(self, text):
+        # Update motion type and input field states
         self.current_motion_type = text.lower()
         self.clear_path()
         self.points = []
@@ -95,6 +97,7 @@ class DynamicObstaclesPage(QWizardPage):
         self.semi_minor_input.setEnabled(self.current_motion_type == "elliptical")
 
     def select_obstacle(self, item):
+        # Load selected obstacle's motion properties
         self.current_obstacle = item.text()
         model = next((m for m in self.world_manager.models if m["name"] == self.current_obstacle), None)
         if model and "motion" in model["properties"]:
@@ -109,7 +112,7 @@ class DynamicObstaclesPage(QWizardPage):
                 self.semi_major_input.setText(str(motion["semi_major"]))
                 self.semi_minor_input.setText(str(motion["semi_minor"]))
             if motion["type"] in ["linear", "polygon"]:
-                self.points = [QPointF(x * 100, -y * 100) for x, y in motion["path"]]  # Add negation to y
+                self.points = [QPointF(x * 100, -y * 100) for x, y in motion["path"]]
             elif motion["type"] == "elliptical":
                 center_m = model["properties"]["position"][:2]
                 center = QPointF(center_m[0] * 100, -center_m[1] * 100)
@@ -127,17 +130,20 @@ class DynamicObstaclesPage(QWizardPage):
             self.semi_minor_input.clear()
 
     def start_path(self):
+        # Begin defining motion path
         if self.current_obstacle and self.current_motion_type:
             self.clicking_enabled = True
             self.points = []
             self.clear_path()
 
     def finish_path(self):
+        # Complete motion path definition
         self.clicking_enabled = False
         self.draw_path(close_polygon=True if self.current_motion_type == "polygon" else False)
         self.store_motion()
 
     def eventFilter(self, obj, event):
+        # Handle mouse clicks to define motion path points
         if obj == self.view and event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self.clicking_enabled:
             clicked_point = self.view.mapToScene(event.pos())
             point = self.snap_to_grid(clicked_point)
@@ -156,17 +162,20 @@ class DynamicObstaclesPage(QWizardPage):
         return super().eventFilter(obj, event)
 
     def snap_to_grid(self, point, grid_spacing=10):
+        # Snap point to grid for path placement
         x = round(point.x() / grid_spacing) * grid_spacing
         y = round(point.y() / grid_spacing) * grid_spacing
         return QPointF(x, y)
 
     def clear_path(self):
+        # Remove existing path items from scene
         if self.current_obstacle and self.current_obstacle in self.wizard().path_items:
             for item in self.wizard().path_items[self.current_obstacle]:
                 self.scene.removeItem(item)
             del self.wizard().path_items[self.current_obstacle]
 
     def draw_path(self, close_polygon=False):
+        # Draw motion path based on type
         self.clear_path()
         items = []
         color = {"linear": "red", "elliptical": "green", "polygon": "blue"}[self.current_motion_type]
@@ -207,6 +216,7 @@ class DynamicObstaclesPage(QWizardPage):
         self.wizard().path_items[self.current_obstacle] = items
 
     def store_motion(self):
+        # Store motion properties for the selected obstacle
         if not self.current_obstacle or not self.current_motion_type or not self.points:
             return
         try:
@@ -248,6 +258,7 @@ class DynamicObstaclesPage(QWizardPage):
         model["status"] = "updated" if model.get("status") else "new"
 
     def apply_changes(self):
+        # Apply changes to the world and refresh canvas
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
             return
@@ -259,4 +270,5 @@ class DynamicObstaclesPage(QWizardPage):
             QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
 
     def isComplete(self):
+        # Check if world manager and world name are set
         return self.world_manager is not None and self.world_manager.world_name is not None
