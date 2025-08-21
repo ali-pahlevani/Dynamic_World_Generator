@@ -222,10 +222,6 @@ Contributions are welcome! To contribute:
 
 Please include tests and documentation updates. For major changes, discuss in a *GitHub Issue* first.
 
-## License
-
-This project is licensed under the *MIT License*. See the [LICENSE](LICENSE) file for details.
-
 ---
 
 + If you have any questions, please let me know: **a.pahlevani1998@gmail.com**
