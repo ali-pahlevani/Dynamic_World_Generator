@@ -67,8 +67,6 @@ Dynamic_World_Generator/
 * **`images/`**: Stores images for *UI* (intro and future features).
 * **`worlds/`**: Stores *Gazebo* world files and generated motion scripts.
 
-![Code Structure Diagram](path/to/code_structure_diagram.png)
-
 ## Installation and Usage
 
 ### Prerequisites
@@ -119,8 +117,6 @@ Dynamic_World_Generator/
 * **Missing SDF Files**: Ensure `empty_world.sdf` exists in `worlds/gazebo/{version}/`.
 * **Path Issues**: If images or worlds are not found, verify paths in `code/utils/config.py`. Update `PROJECT_ROOT` if the project is moved.
 * **Transport Errors (Harmonic)**: Ensure `gz-transport13` and `gz-msgs10` are installed for dynamic obstacle motion scripts.
-
-![Installation Troubleshooting Screenshot](path/to/installation_troubleshooting_screenshot.png)
 
 ## Tutorial: Creating a Complete Dynamic World
 
@@ -217,8 +213,6 @@ The wizard guides you through a step-by-step process to build a dynamic world. B
 * **And definitely a lot more!!!**
 
 I’d **love collaborations**! Contribute via pull requests on *GitHub* for bug fixes, new features, or documentation improvements. Reach out via *GitHub Issues* for questions, suggestions, or partnership ideas.
-
-![Future Vision Screenshot](path/to/future_vision_screenshot.png)
 
 ## Contributing
 
