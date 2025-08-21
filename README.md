@@ -91,8 +91,8 @@ Dynamic_World_Generator/
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/ali-pahlevani/dynamic-world-generator.git
-   cd dynamic-world-generator
+   git clone https://github.com/ali-pahlevani/Dynamic_World_Generator.git
+   cd Dynamic_World_Generator
    ```
 
 2. **Run the Application**:
