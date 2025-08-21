@@ -85,7 +85,7 @@ Dynamic_World_Generator/
     ```bash
     pip install gz-transport13 gz-msgs10
     ```
-* **Images and Worlds**: Ensure the `images/intro/`, `images/future/`, and `worlds/gazebo/{version}/empty_world.sdf` directories exist in the project root. Copy sample files or create placeholders if needed.
+* **Images and Worlds**: Ensure the `images/intro/`, `images/future/`, and `worlds/gazebo/{version}/empty_world.sdf` directories exist in the project root.
 
 ### Setup
 
