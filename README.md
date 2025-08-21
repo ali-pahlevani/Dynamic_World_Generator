@@ -1,6 +1,6 @@
 # Dynamic World Generator Wizard
 
-![Dynamic World Generator Wizard Banner](path/to/banner.png)
+![Dynamic World Generator Wizard Banner](https://github.com/user-attachments/assets/1b00aa22-24d7-40f1-8526-a3612bd7f503)
 
 **Dynamic World Generator Wizard** is a *PyQt5*-based graphical user interface (*GUI*) application designed to create and manage dynamic simulation worlds for *Gazebo* (*Harmonic* or *Fortress* versions). It allows users to build custom worlds with walls, static obstacles (boxes, cylinders, spheres), and dynamic obstacles with various motion paths (linear, elliptical, polygon). The tool generates *SDF* (*Simulation Description Format*) files for *Gazebo* and includes a motion script to animate dynamic obstacles. This app is ideal for robotics simulation, testing autonomous systems, or educational purposes in simulation environments.
 
@@ -14,8 +14,6 @@ The wizard guides users through a step-by-step process, ensuring an intuitive ex
 * **Dynamic Obstacles**: Assign motion paths (linear, elliptical, polygon) with velocity and randomness (*std*).
 * **Preview and Apply**: Real-time canvas preview and apply changes to *Gazebo* simulation.
 * **Coming Soon**: Teasers for future features like *Gazebo Ionic* and *Isaac Sim 4.5.0/5.0.0*.
-
-![Simulation Selection Page Screenshot](path/to/simulation_selection_screenshot.png)
 
 ## Code Structure
 
@@ -124,7 +122,7 @@ The wizard guides you through a step-by-step process to build a dynamic world. B
 
 ### Step 1: Welcome Page
 
-![Welcome Page Screenshot](path/to/welcome_page_screenshot.png)
+<img width="1857" height="1048" alt="Welcome Page" src="https://github.com/user-attachments/assets/7bbd4df6-e7d6-4bad-8743-cbef0037cfc5" />
 
 ### Step 2: Select Simulation Platform
 
@@ -134,7 +132,7 @@ The wizard guides you through a step-by-step process to build a dynamic world. B
   * **Isaac Sim**: Under development, currently disabled.
   * Click *Next* when done.
 
-![Simulation Selection Screenshot](path/to/simulation_selection_screenshot.png)
+<img width="1857" height="1048" alt="Simulation Selection" src="https://github.com/user-attachments/assets/7d7aa432-506c-49c9-9ad2-50e3b1d29ad7" />
 
 ### Step 3: Design Walls
 
@@ -150,7 +148,7 @@ The wizard guides you through a step-by-step process to build a dynamic world. B
 * **Canvas Controls**: Zoom with the mouse wheel, pan with the middle mouse button.
 * Click *Next* when done.
 
-![Walls Design Screenshot](path/to/walls_design_screenshot.png)
+<img width="1857" height="1048" alt="Walls Design" src="https://github.com/user-attachments/assets/522a2955-2ce6-49a9-a17e-8fd4d751ad32" />
 
 ### Step 4: Add Static Obstacles
 
@@ -167,7 +165,7 @@ The wizard guides you through a step-by-step process to build a dynamic world. B
 * **Canvas Controls**: Zoom/pan as before.
 * Click *Next* when done.
 
-![Static Obstacles Screenshot](path/to/static_obstacles_screenshot.png)
+<img width="1857" height="1048" alt="Static Obstacles" src="https://github.com/user-attachments/assets/2f1c0359-c13b-42ad-8213-d121789d3b4f" />
 
 ### Step 5: Add Dynamic Obstacles
 
@@ -190,7 +188,7 @@ The wizard guides you through a step-by-step process to build a dynamic world. B
 * **Canvas Controls**: Zoom/pan as before.
 * Click *Next* when done.
 
-![Dynamic Obstacles Screenshot](path/to/dynamic_obstacles_screenshot.png)
+<img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/b287e0b4-e7d1-41d3-8f04-daedb002bf95" />
 
 ### Step 6: Coming Soon Page
 
@@ -199,7 +197,7 @@ The wizard guides you through a step-by-step process to build a dynamic world. B
   * **Isaac Sim 4.5.0/5.0.0**: Future simulator support.
 * Click *Finish* to exit the wizard.
 
-![Coming Soon Screenshot](path/to/coming_soon_screenshot.png)
+<img width="1857" height="1048" alt="Coming Soon" src="https://github.com/user-attachments/assets/56a646ee-42cc-4d98-b168-8dd1ad0e1214" />
 
 ## Future Visions
 
