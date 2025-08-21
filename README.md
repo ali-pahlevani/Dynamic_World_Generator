@@ -24,13 +24,12 @@ The codebase is organized in a modular structure for maintainability, with class
 ```
 Dynamic_World_Generator/
 ├── code/
+│   ├── __init__.py
 │   ├── classes/
-│   │   ├── __init__.py
 │   │   ├── dynamic_world_wizard.py  # Main wizard class handling navigation and canvas
 │   │   ├── zoomable_graphics_view.py  # Custom graphics view for zooming and panning the canvas
 │   │   ├── world_manager.py  # Handles world creation, loading, model management, and SDF generation
 │   │   ├── pages/
-│   │   │   ├── __init__.py
 │   │   │   ├── welcome_page.py  # Welcome page with title and GIF
 │   │   │   ├── sim_selection_page.py  # Simulation platform selection page
 │   │   │   ├── walls_design_page.py  # Wall design page with canvas drawing
@@ -38,7 +37,6 @@ Dynamic_World_Generator/
 │   │   │   ├── dynamic_obstacles_page.py  # Dynamic obstacles and motion paths page
 │   │   │   └── coming_soon_page.py  # Coming soon features page
 │   ├── utils/
-│   │   ├── __init__.py
 │   │   ├── config.py  # Directory constants for images and worlds
 │   │   └── color_utils.py  # Utility for color mapping
 │   └── dwg_wizard.py  # Entry point to run the application
@@ -54,8 +52,10 @@ Dynamic_World_Generator/
 ├── worlds/
 │   └── gazebo/
 │       ├── harmonic/
+│       │   ├── move_code # Motion scripts to animate dynamic obstacles (separate .py file + bash launcher file)
 │       │   └── empty_world.sdf
 │       └── fortress/
+│           ├── move_code # Motion scripts to animate dynamic obstacles (separate .py file + bash launcher file)
 │           └── empty_world.sdf
 └── README.md
 ```
