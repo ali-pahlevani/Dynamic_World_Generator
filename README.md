@@ -228,7 +228,6 @@ This project is licensed under the *MIT License*. See the [LICENSE](LICENSE) fil
 
 ---
 
-If you have any questions, please let me know: **a.pahlevani1998@gmail.com**
++ If you have any questions, please let me know: **a.pahlevani1998@gmail.com**
 
 + Also, don't forget to check out our **website** at: **https://www.SLAMbotics.org**
-+ 
