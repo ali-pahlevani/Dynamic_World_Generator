@@ -76,13 +76,11 @@ Dynamic_World_Generator/
   ```
 * **Gazebo**: Install *Gazebo Harmonic* (recommended) or *Fortress*:
   * For *Harmonic* (*Ubuntu*/*Debian*), please visit:
-    ```bash
     [https://gazebosim.org/docs/harmonic/install_ubuntu/](https://gazebosim.org/docs/harmonic/install_ubuntu/)
-    ```
+
   * For *Fortress*, please visit:
-    ```bash
     [https://gazebosim.org/docs/fortress/install_ubuntu/](https://gazebosim.org/docs/fortress/install_ubuntu/)
-    ```
+
   * For *Harmonic*, also install transport libraries:
     ```bash
     pip install gz-transport13 gz-msgs10
