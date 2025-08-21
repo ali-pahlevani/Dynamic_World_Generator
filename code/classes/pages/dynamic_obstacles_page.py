@@ -109,7 +109,7 @@ class DynamicObstaclesPage(QWizardPage):
                 self.semi_major_input.setText(str(motion["semi_major"]))
                 self.semi_minor_input.setText(str(motion["semi_minor"]))
             if motion["type"] in ["linear", "polygon"]:
-                self.points = [QPointF(x * 100, y * 100) for x, y in motion["path"]]
+                self.points = [QPointF(x * 100, -y * 100) for x, y in motion["path"]]  # Add negation to y
             elif motion["type"] == "elliptical":
                 center_m = model["properties"]["position"][:2]
                 center = QPointF(center_m[0] * 100, -center_m[1] * 100)
