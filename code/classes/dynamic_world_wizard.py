@@ -17,7 +17,7 @@ class DynamicWorldWizard(QWizard):
         super().__init__()
         self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
         self.setWindowTitle("Dynamic World Generator Wizard (V1)")
-        self.resize(1500, 900)
+        self.resize(1600, 800)
         self.setMinimumWidth(800)
 
         # Setup scene and model storage
