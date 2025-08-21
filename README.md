@@ -1,4 +1,4 @@
-# Dynamic World Generator Wizard
+# Dynamic World Generator Wizard (V1)
 
 ![Dynamic World Generator Wizard Banner](https://github.com/user-attachments/assets/1b00aa22-24d7-40f1-8526-a3612bd7f503)
 
@@ -225,3 +225,10 @@ Please include tests and documentation updates. For major changes, discuss in a 
 ## License
 
 This project is licensed under the *MIT License*. See the [LICENSE](LICENSE) file for details.
+
+---
+
+If you have any questions, please let me know: **a.pahlevani1998@gmail.com**
+
++ Also, don't forget to check out our **website** at: **https://www.SLAMbotics.org**
++ 
