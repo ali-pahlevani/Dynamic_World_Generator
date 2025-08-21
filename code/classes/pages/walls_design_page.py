@@ -9,18 +9,20 @@ from utils.config import WORLDS_GAZEBO_DIR
 
 class WallsDesignPage(QWizardPage):
     def __init__(self, scene):
+        # Initialize wizard page with title and layout
         super().__init__()
         self.setTitle("Design Walls")
-
         self.registerField("world_name", self)
         self.registerField("wall_list", self)
         self.world_manager = None
         self.scene = scene
 
+        # Setup main layout with left panel and canvas
         layout = QHBoxLayout()
-
         left_widget = QWidget()
         left_layout = QVBoxLayout()
+
+        # Add buttons and input fields to left panel
         self.create_world_button = QPushButton("Create New World")
         self.create_world_button.clicked.connect(self.create_new_world)
         left_layout.addWidget(self.create_world_button)
@@ -57,32 +59,35 @@ class WallsDesignPage(QWizardPage):
         left_layout.addWidget(self.apply_button)
         left_widget.setLayout(left_layout)
 
+        # Setup zoomable canvas
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
 
-        # Set size constraints: canvas at 70% of content width, left panel takes the rest
-        window_width = 1500  # Default wizard width
-        canvas_width = int(window_width * 0.7)  # 70% of window width
-        self.view.setMinimumWidth(int(800 * 0.7))  # Minimum canvas width (70% of 800px window)
-        self.view.setMaximumWidth(canvas_width)  # Initial canvas width
-        left_widget.setMinimumWidth(150)  # Minimum left panel width for usability
-        left_widget.setMaximumWidth(window_width - canvas_width - 260)  # Initial left panel width
+        # Set size constraints for canvas and left panel
+        window_width = 1500
+        canvas_width = int(window_width * 0.7)
+        self.view.setMinimumWidth(int(800 * 0.7))
+        self.view.setMaximumWidth(canvas_width)
+        left_widget.setMinimumWidth(150)
+        left_widget.setMaximumWidth(window_width - canvas_width - 260)
 
         layout.addWidget(left_widget)
         layout.addWidget(self.view)
-
         self.setLayout(layout)
 
     def initializePage(self):
+        # Set world manager from wizard
         self.world_manager = self.wizard().world_manager
 
     def snap_to_grid(self, point, grid_spacing=10):
+        # Snap point to grid for wall placement
         x = round(point.x() / grid_spacing) * grid_spacing
         y = round(point.y() / grid_spacing) * grid_spacing
         return QPointF(x, y)
 
     def eventFilter(self, obj, event):
+        # Handle mouse clicks to add walls
         if obj == self.view and self.world_manager:
             if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
                 if not hasattr(self, 'start_point'):
@@ -112,6 +117,7 @@ class WallsDesignPage(QWizardPage):
         return super().eventFilter(obj, event)
 
     def create_new_world(self):
+        # Create a new world from empty template
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
@@ -121,14 +127,10 @@ class WallsDesignPage(QWizardPage):
             return
         try:
             empty_world_path = os.path.join(WORLDS_GAZEBO_DIR, self.world_manager.version, "empty_world.sdf")
-            print(f"Copying empty world from: {empty_world_path}")
             if not os.path.exists(empty_world_path):
                 raise FileNotFoundError(f"Empty world file not found: {empty_world_path}")
             new_world_path = os.path.join(WORLDS_GAZEBO_DIR, self.world_manager.version, f"{world_name}.sdf")
-            print(f"Creating new world at: {new_world_path}")
-
             shutil.copyfile(empty_world_path, new_world_path)
-
             tree = ET.parse(new_world_path)
             root = tree.getroot()
             world_elem = root.find("world")
@@ -137,9 +139,7 @@ class WallsDesignPage(QWizardPage):
             else:
                 raise ValueError("SDF file does not contain a <world> element")
             tree.write(new_world_path, encoding="utf-8", xml_declaration=True)
-
             self.world_manager.load_world(world_name)
-
             self.wall_list.clear()
             self.wizard().refresh_canvas(self.scene)
             QMessageBox.information(self, "Success", f"Created and loaded new world: {world_name}")
@@ -148,6 +148,7 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.critical(self, "Error", f"Failed to create world: {str(e)}")
 
     def load_world(self):
+        # Load an existing world
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
@@ -170,6 +171,7 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.critical(self, "Error", f"Failed to load world: {str(e)}")
 
     def remove_selected_wall(self):
+        # Remove selected wall from scene and world
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
@@ -188,6 +190,7 @@ class WallsDesignPage(QWizardPage):
             self.wall_list.takeItem(self.wall_list.row(selected))
 
     def apply_changes(self):
+        # Apply changes to the world and refresh canvas
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
@@ -199,4 +202,5 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
 
     def isComplete(self):
+        # Check if world manager and world name are set
         return self.world_manager is not None and self.world_manager.world_name is not None

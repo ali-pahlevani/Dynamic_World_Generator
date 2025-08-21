@@ -8,6 +8,7 @@ from utils.config import PROJECT_ROOT, WORLDS_GAZEBO_DIR
 
 class WorldManager:
     def __init__(self, simulation, version):
+        # Initialize world manager with simulation and version
         self.simulation = simulation
         self.version = version
         self.sdf_version = "1.8" if version == "fortress" else "1.9"
@@ -18,12 +19,12 @@ class WorldManager:
         self.sdf_root = None
         self.process = None
         self.script_process = None
-        self.base_dir = PROJECT_ROOT  # Use PROJECT_ROOT from config.py
+        self.base_dir = PROJECT_ROOT
 
     def create_new_world(self, world_name):
+        # Create a new world from empty template
         self.world_name = world_name
         empty_world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, "empty_world.sdf")
-        print(f"Looking for empty world at: {empty_world_path}")
         if not os.path.exists(empty_world_path):
             raise FileNotFoundError(f"Empty world file not found: {empty_world_path}")
 
@@ -33,16 +34,15 @@ class WorldManager:
             cmd = ["gz", "sim", empty_world_path]
         self.process = subprocess.Popen(cmd)
         self.world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, f"{world_name}.sdf")
-        print(f"Creating world at: {self.world_path}")
         self.models = []
         self.sdf_tree = ET.parse(empty_world_path)
         self.sdf_root = self.sdf_tree.getroot()
         self.world_name = self.sdf_root.find("world").get("name")
 
     def load_world(self, world_name):
+        # Load an existing world
         self.world_name = world_name
         self.world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, f"{world_name}.sdf")
-        print(f"Loading world at: {self.world_path}")
         if not os.path.exists(self.world_path):
             raise FileNotFoundError(f"World file not found: {self.world_path}")
 
@@ -57,7 +57,7 @@ class WorldManager:
         self.world_name = self.sdf_root.find("world").get("name")
         self.models = []
 
-        # Inverse color mapping to convert RGB back to color name
+        # Map RGB values to color names
         rgb_to_color = {
             (0, 0, 0): "Black",
             (0.5, 0.5, 0.5): "Gray",
@@ -67,10 +67,9 @@ class WorldManager:
             (0, 1, 0): "Green"
         }
 
+        # Parse models from SDF
         for model_elem in self.sdf_root.findall(".//model"):
             name = model_elem.get("name")
-            motion_elem = model_elem.find(".//motion")
-            print(f"Loading model: {name}, Motion: {motion_elem is not None}")
             type_elem = model_elem.find("type")
             model_type = type_elem.text if type_elem is not None else None
 
@@ -91,12 +90,12 @@ class WorldManager:
             pose = [float(x) for x in pose_str.split()]
             x, y, z, _, _, yaw = pose
 
-            # Parse color from <material><diffuse>
+            # Parse color from material
             material = model_elem.find(".//material/diffuse")
-            color_name = "Gray"  # Default
+            color_name = "Gray"
             if material is not None:
-                rgb = tuple(float(x) for x in material.text.split()[:3])  # Get first three values (R, G, B)
-                color_name = rgb_to_color.get(rgb, "Gray")  # Map RGB to color name, default to Gray
+                rgb = tuple(float(x) for x in material.text.split()[:3])
+                color_name = rgb_to_color.get(rgb, "Gray")
 
             geometry = model_elem.find(".//geometry")
             if geometry:
@@ -111,7 +110,6 @@ class WorldManager:
                         start_y = y - dy
                         end_x = x + dx
                         end_y = y + dy
-
                         properties = {
                             "start": (start_x, start_y),
                             "end": (end_x, end_y),
@@ -141,7 +139,7 @@ class WorldManager:
                         "color": color_name
                     }
 
-            # Parse motion if present (for dynamic obstacles)
+            # Parse motion for dynamic obstacles
             motion_elem = model_elem.find(".//motion")
             if motion_elem is not None:
                 motion = {"type": motion_elem.find("type").text}
@@ -172,6 +170,7 @@ class WorldManager:
             })
 
     def add_model(self, model):
+        # Add or update a model in the world
         for existing_model in self.models:
             if existing_model["name"] == model["name"]:
                 existing_model.update(model)
@@ -179,6 +178,7 @@ class WorldManager:
         self.models.append(model)
 
     def apply_changes(self):
+        # Apply model changes to the simulation and SDF
         if not self.process or self.process.poll() is not None:
             raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
 
@@ -195,12 +195,8 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                print("Executing command:", " ".join(cmd))
                 result = subprocess.run(cmd, capture_output=True, text=True)
-                print("Result stdout:", result.stdout)
-                print("Result stderr:", result.stderr)
                 if result.returncode != 0:
-                    print(f"Warning: Failed to remove model {model['name']} for update: {result.stderr}")
                     continue
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
@@ -217,12 +213,8 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                print("Executing command:", " ".join(cmd))
                 result = subprocess.run(cmd, capture_output=True, text=True)
-                print("Result stdout:", result.stdout)
-                print("Result stderr:", result.stderr)
                 if result.returncode != 0 or "data: true" not in result.stdout:
-                    print(f"Warning: Failed to add model {model['name']}: {result.stderr}")
                     continue
                 time.sleep(1)
                 sdf_snippet_file = self.generate_model_sdf(model, for_service=False)
@@ -238,17 +230,14 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                print("Executing command:", " ".join(cmd))
                 result = subprocess.run(cmd, capture_output=True, text=True)
-                print("Result stdout:", result.stdout)
-                print("Result stderr:", result.stderr)
                 if result.returncode != 0:
-                    print(f"Warning: Failed to remove model {model['name']}: {result.stderr}")
                     continue
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
 
+        # Generate motion script for dynamic models
         dynamic_models = [m for m in self.models if "motion" in m["properties"]]
         if dynamic_models:
             move_code_dir = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code")
@@ -285,7 +274,6 @@ class WorldManager:
                     f.write('    cmd = [prefix, "service", "-s", f"/world/{world_name}/set_pose", "--reqtype", f"{reqtype_prefix}.Pose", "--reptype", f"{reqtype_prefix}.Boolean", "--timeout", "500", "--req", request_str]\n')
                     f.write('    result = subprocess.run(cmd, capture_output=True, text=True)\n')
                     f.write('    if result.returncode != 0:\n')
-                    f.write('        print(f"Failed to set pose for {model_name}: {result.stderr}")\n')
                     f.write('        return False\n')
                     f.write('    return True\n\n')
                 f.write('motions = {}\nstates = {}\n')
@@ -333,7 +321,6 @@ class WorldManager:
                 f.write('                    new_y = start[1] + t * dy\n')
                 f.write('                state["current_pos"] = [new_x, new_y]\n')
                 f.write('                if not set_pose(model_name, new_x, new_y, state["z"]):\n')
-                f.write('                    print(f"Stopping script as set_pose failed for {model_name}")\n')
                 f.write('                    exit(1)\n')
                 f.write('            elif motion["type"] == "elliptical":\n')
                 f.write('                delta_theta = velocity / (2 * math.pi * motion["semi_major"]) * 2 * math.pi * dt\n')
@@ -342,7 +329,6 @@ class WorldManager:
                 f.write('                x = state["center"][0] + motion["semi_major"] * math.cos(theta) * math.cos(motion["angle"]) - motion["semi_minor"] * math.sin(theta) * math.sin(motion["angle"])\n')
                 f.write('                y = state["center"][1] + motion["semi_major"] * math.cos(theta) * math.sin(motion["angle"]) + motion["semi_minor"] * math.sin(theta) * math.cos(motion["angle"])\n')
                 f.write('                if not set_pose(model_name, x, y, state["z"]):\n')
-                f.write('                    print(f"Stopping script as set_pose failed for {model_name}")\n')
                 f.write('                    exit(1)\n')
                 f.write('            elif motion["type"] == "polygon":\n')
                 f.write('                path = state["path"]\n')
@@ -363,14 +349,13 @@ class WorldManager:
                 f.write('                x = start[0] + state["t"] * dx\n')
                 f.write('                y = start[1] + state["t"] * dy\n')
                 f.write('                if not set_pose(model_name, x, y, state["z"]):\n')
-                f.write('                    print(f"Stopping script as set_pose failed for {model_name}")\n')
                 f.write('                    exit(1)\n')
                 f.write('        time.sleep(linear_dt if motion["type"] == "linear" else dt)\n')
                 f.write('    except KeyboardInterrupt:\n')
-                f.write('        print("Motion script interrupted")\n')
                 f.write('        exit(0)\n')
             os.chmod(script_path, 0o755)
 
+            # Generate launch script
             launch_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code", f"{self.world_name}_launch.sh")
             with open(launch_path, 'w') as f:
                 f.write('#!/bin/bash\n')
@@ -383,6 +368,7 @@ class WorldManager:
                 f.write('wait\n')
             os.chmod(launch_path, 0o755)
 
+            # Manage motion script process
             if self.script_process and self.script_process.poll() is None:
                 self.script_process.terminate()
                 try:
@@ -396,65 +382,48 @@ class WorldManager:
             model["status"] = ""
 
     def cleanup(self):
+        # Clean up processes and save world state
         import signal
-        print("Starting cleanup of WorldManager")
-        
-        # Save the current world state before closing
         if self.sdf_tree and self.world_path:
             try:
                 self.save_sdf(self.world_path)
-                print(f"Saved world state to {self.world_path}")
-            except Exception as e:
-                print(f"Warning: Failed to save world state: {str(e)}")
+            except Exception:
+                pass
 
-        # Terminate the motion script process
+        # Terminate motion script process
         if self.script_process and self.script_process.poll() is None:
-            print(f"Terminating motion script process (PID: {self.script_process.pid})")
             try:
-                # Send SIGINT first for graceful shutdown
                 self.script_process.send_signal(signal.SIGINT)
                 self.script_process.wait(timeout=2)
-                print("Motion script process terminated gracefully")
             except subprocess.TimeoutExpired:
-                print("Motion script process did not terminate gracefully, sending SIGTERM")
                 self.script_process.terminate()
                 try:
                     self.script_process.wait(timeout=2)
-                    print("Motion script process terminated with SIGTERM")
                 except subprocess.TimeoutExpired:
-                    print("Motion script process still running, sending SIGKILL")
                     self.script_process.kill()
                     self.script_process.wait(timeout=2)
-                    print("Motion script process killed")
-            except Exception as e:
-                print(f"Error terminating motion script process: {str(e)}")
+            except Exception:
+                pass
             self.script_process = None
 
-        # Terminate the Gazebo process
+        # Terminate Gazebo process
         if self.process and self.process.poll() is None:
-            print(f"Terminating Gazebo process (PID: {self.process.pid})")
             try:
-                # Send SIGINT first for graceful shutdown
                 self.process.send_signal(signal.SIGINT)
                 self.process.wait(timeout=2)
-                print("Gazebo process terminated gracefully")
             except subprocess.TimeoutExpired:
-                print("Gazebo process did not terminate gracefully, sending SIGTERM")
                 self.process.terminate()
                 try:
                     self.process.wait(timeout=2)
-                    print("Gazebo process terminated with SIGTERM")
                 except subprocess.TimeoutExpired:
-                    print("Gazebo process still running, sending SIGKILL")
                     self.process.kill()
                     self.process.wait(timeout=2)
-                    print("Gazebo process killed")
-            except Exception as e:
-                print(f"Error terminating Gazebo process: {str(e)}")
+            except Exception:
+                pass
             self.process = None
-        print("Cleanup completed")
 
     def generate_model_sdf(self, model, for_service=False):
+        # Generate SDF snippet for a model
         model_type = model["type"]
         props = model["properties"]
         color_rgb = get_color(props["color"])
@@ -510,8 +479,7 @@ class WorldManager:
                         <diffuse>{color_rgb[0]} {color_rgb[1]} {color_rgb[2]} 1</diffuse>
                     </material>
                 </visual>"""
-        if not static_str == "true":  # Only for dynamic models
-            # Calculate mass and inertia (assume density=1000 kg/m^3 for realism)
+        if not static_str == "true":
             density = 1000.0
             if model_type in ["wall", "box"]:
                 w, l, h = map(float, size_str.split())
@@ -562,11 +530,10 @@ class WorldManager:
         return sdf
 
     def save_sdf(self, path):
+        # Save SDF file to disk
         if self.sdf_tree:
             try:
-                os.makedirs(os.path.dirname(path), exist_ok=True)  # Ensure directory exists
+                os.makedirs(os.path.dirname(path), exist_ok=True)
                 self.sdf_tree.write(path, encoding="utf-8", xml_declaration=True)
-                print(f"Saved SDF to {path}")
             except Exception as e:
-                print(f"Error saving SDF to {path}: {str(e)}")
                 raise

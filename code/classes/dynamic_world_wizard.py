@@ -13,24 +13,25 @@ import math
 
 class DynamicWorldWizard(QWizard):
     def __init__(self):
-        print("Entering DynamicWorldWizard.__init__")
+        # Initialize wizard with window settings and navigation
         super().__init__()
         self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
         self.setWindowTitle("Dynamic World Generator Wizard (V1)")
         self.resize(1500, 900)
-        self.setMinimumWidth(800)  # Set minimum window width to allow narrower resizing
-        print("Window flags and size set")
+        self.setMinimumWidth(800)
 
+        # Setup scene and model storage
         self.world_manager = None
         self.scene = QGraphicsScene()
         self.wall_items = {}
         self.obstacle_items = {}
         self.path_items = {}
 
+        # Create navigation list
         self.nav_list = QListWidget()
         self.nav_list.addItems(["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
                                 "Add Dynamic Obstacles", "Coming Soon"])
-        self.nav_list.setFont(QFont("Arial", 14, QFont.Bold))  # Default font size
+        self.nav_list.setFont(QFont("Arial", 14, QFont.Bold))
         self.nav_list.setStyleSheet("""
             QListWidget {
                 background-color: #2E2E2E;
@@ -49,64 +50,53 @@ class DynamicWorldWizard(QWizard):
                 background-color: #666666;
             }
         """)
-
         self.nav_list.setCurrentRow(0)
         self.nav_list.itemClicked.connect(self.navigate_to_page)
-        print("Navigation list initialized")
 
+        # Add wizard pages
         self.addPage(WelcomePage())
-        print("Added WelcomePage")
         sim_selection_page = SimSelectionPage()
         self.addPage(sim_selection_page)
-        print("Added SimSelectionPage")
         self.walls_page = WallsDesignPage(self.scene)
         self.addPage(self.walls_page)
-        print("Added WallsDesignPage")
         self.static_obstacles_page = StaticObstaclesPage(self.scene)
         self.addPage(self.static_obstacles_page)
-        print("Added StaticObstaclesPage")
         self.dynamic_obstacles_page = DynamicObstaclesPage(self.scene)
         self.addPage(self.dynamic_obstacles_page)
-        print("Added DynamicObstaclesPage")
         self.addPage(ComingSoonPage())
-        print("Added ComingSoonPage")
 
-
+        # Connect signals for world manager and navigation
         sim_selection_page.simulationSelected.connect(self.initialize_world_manager)
-        print("Connected simulationSelected signal")
+        self.currentIdChanged.connect(self.update_navigation)
 
+        # Setup sidebar with navigation list
         side_widget = QWidget()
         side_layout = QVBoxLayout()
         side_layout.addWidget(self.nav_list)
         side_layout.addStretch()
         side_widget.setLayout(side_layout)
         self.setSideWidget(side_widget)
-        print("Side widget set")
-
-        self.currentIdChanged.connect(self.update_navigation)
-        print("Connected currentIdChanged signal")
 
     def resizeEvent(self, event):
+        # Adjust navigation and page layouts on window resize
         super().resizeEvent(event)
-        window_width = max(self.width(), 800)  # Respect minimum window width
-        nav_width = max(min(int(window_width * 0.2), 300), 200)  # 20% of window width, clamped between 200-300px
+        window_width = max(self.width(), 800)
+        nav_width = max(min(int(window_width * 0.2), 300), 200)
         self.nav_list.setFixedWidth(nav_width)
-        # Scale font size: 12pt at 200px, 16pt at 300px
         font_size = 12 + (nav_width - 200) * (16 - 12) / (300 - 200)
         self.nav_list.setFont(QFont("Arial", int(font_size), QFont.Bold))
-        content_width = window_width - nav_width  # Width for canvas + left panel
-        canvas_width = int(content_width * 0.7)  # 70% for canvas
-        left_width = content_width - canvas_width  # Remaining for left panel
+        content_width = window_width - nav_width
+        canvas_width = int(content_width * 0.7)
+        left_width = content_width - canvas_width
         
-        # Update WallsDesignPage
+        # Update canvas and panel widths for design pages
         if hasattr(self, 'walls_page'):
             self.walls_page.view.setFixedWidth(canvas_width)
             for widget in self.walls_page.findChildren(QWidget):
                 if widget.layout() and isinstance(widget.layout(), QVBoxLayout):
                     widget.setMaximumWidth(left_width)
-                    widget.setMinimumWidth(150)  # Ensure usability
+                    widget.setMinimumWidth(150)
         
-        # Update StaticObstaclesPage
         if hasattr(self, 'static_obstacles_page'):
             self.static_obstacles_page.view.setFixedWidth(canvas_width)
             for widget in self.static_obstacles_page.findChildren(QWidget):
@@ -114,7 +104,6 @@ class DynamicWorldWizard(QWizard):
                     widget.setMaximumWidth(left_width)
                     widget.setMinimumWidth(150)
         
-        # Update DynamicObstaclesPage
         if hasattr(self, 'dynamic_obstacles_page'):
             self.dynamic_obstacles_page.view.setFixedWidth(canvas_width)
             for widget in self.dynamic_obstacles_page.findChildren(QWidget):
@@ -123,8 +112,9 @@ class DynamicWorldWizard(QWizard):
                     widget.setMinimumWidth(150)
 
     def refresh_canvas(self, scene):
+        # Clear and redraw scene with grid and models
         scene.clear()
-        self.path_items.clear()  # Add this to ensure path_items is reset
+        self.path_items.clear()
         grid_spacing = 10
         for x in range(-1000, 1000, grid_spacing):
             scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
@@ -138,6 +128,7 @@ class DynamicWorldWizard(QWizard):
                 if model.get("status") == "removed":
                     continue
                 if model["type"] == "wall":
+                    # Draw wall as a line with label
                     start = QPointF(model["properties"]["start"][0] * 100, -model["properties"]["start"][1] * 100)
                     end = QPointF(model["properties"]["end"][0] * 100, -model["properties"]["end"][1] * 100)
                     color_rgb = get_color(model["properties"]["color"])
@@ -151,6 +142,7 @@ class DynamicWorldWizard(QWizard):
                     scene.addItem(text)
                     self.wall_items[model["name"]] = (line, text)
                 elif model["type"] in ["box", "cylinder", "sphere"]:
+                    # Draw obstacle as rectangle or ellipse with label
                     position = model["properties"]["position"]
                     size = model["properties"]["size"]
                     center = QPointF(position[0] * 100, -position[1] * 100)
@@ -163,7 +155,7 @@ class DynamicWorldWizard(QWizard):
                         rect_pixels = QRectF(center.x() - rounded_half_width_pixels, center.y() - rounded_half_length_pixels,
                                              2 * rounded_half_width_pixels, 2 * rounded_half_length_pixels)
                         item = QGraphicsRectItem(rect_pixels)
-                    else:  # cylinder or sphere
+                    else:
                         R = size[0]
                         radius_pixels = R * 100
                         rect_pixels = QRectF(center.x() - radius_pixels, center.y() - radius_pixels, 2 * radius_pixels, 2 * radius_pixels)
@@ -178,6 +170,7 @@ class DynamicWorldWizard(QWizard):
                     self.obstacle_items[model["name"]] = (item, text)
                 motion = model["properties"].get("motion")
                 if motion:
+                    # Draw motion paths (linear, elliptical, or polygon)
                     type_ = motion["type"]
                     color = {"linear": "red", "elliptical": "green", "polygon": "blue"}[type_]
                     items = []
@@ -210,29 +203,29 @@ class DynamicWorldWizard(QWizard):
                     self.path_items[model["name"]] = items
 
     def closeEvent(self, event):
-        print("Closing DynamicWorldWizard")
+        # Clean up world manager on window close
         if self.world_manager:
             self.world_manager.cleanup()
         event.accept()
 
     def initialize_world_manager(self, sim_type, version):
-        print(f"Initializing WorldManager with sim_type={sim_type}, version={version}")
+        # Initialize world manager for selected simulation
         if sim_type == "gazebo" and version in ["fortress", "harmonic"]:
             self.world_manager = WorldManager(sim_type, version)
         else:
             self.world_manager = None
 
     def update_navigation(self, page_id):
-        print(f"Updating navigation to page_id={page_id}")
+        # Sync navigation list with current wizard page
         if page_id != -1:
             page_index = self.pageIds().index(page_id)
             if self.nav_list.currentRow() != page_index:
                 self.nav_list.setCurrentRow(page_index)
 
     def navigate_to_page(self, item):
-        print(f"Navigating to page: {item.text()}")
+        # Navigate to selected page if prerequisites are met
         page_names = ["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
-                    "Add Dynamic Obstacles", "Coming Soon"]
+                      "Add Dynamic Obstacles", "Coming Soon"]
         target_index = page_names.index(item.text())
         current_index = self.pageIds().index(self.currentId())
 
