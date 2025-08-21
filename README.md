@@ -75,13 +75,13 @@ Dynamic_World_Generator/
   pip install PyQt5 lxml
   ```
 * **Gazebo**: Install *Gazebo Harmonic* (recommended) or *Fortress*:
-  * For *Harmonic* (*Ubuntu*/*Debian*):
+  * For *Harmonic* (*Ubuntu*/*Debian*), please visit:
     ```bash
-    sudo apt-get install gz-harmonic
+    [https://gazebosim.org/docs/harmonic/install_ubuntu/](https://gazebosim.org/docs/harmonic/install_ubuntu/)
     ```
-  * For *Fortress*:
+  * For *Fortress*, please visit:
     ```bash
-    sudo apt-get install gz-fortress
+    [https://gazebosim.org/docs/fortress/install_ubuntu/](https://gazebosim.org/docs/fortress/install_ubuntu/)
     ```
   * For *Harmonic*, also install transport libraries:
     ```bash
