@@ -187,15 +187,14 @@ class WorldManager:
         prefix = "ign" if self.version == "fortress" else "gz"
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
 
-        for model in self.models[:]:  # Copy to avoid modification during iteration
+        for model in self.models[:]:
             if model["status"] == "updated":
-                # Remove the model first
                 request_str = f'name: "{model["name"]}", type: 2'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
-                       "--reqtype", f"{reqtype_prefix}.Entity",
-                       "--reptype", f"{reqtype_prefix}.Boolean",
-                       "--timeout", "3000",
-                       "--req", request_str]
+                    "--reqtype", f"{reqtype_prefix}.Entity",
+                    "--reptype", f"{reqtype_prefix}.Boolean",
+                    "--timeout", "3000",
+                    "--req", request_str]
                 print("Executing command:", " ".join(cmd))
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 print("Result stdout:", result.stdout)
@@ -206,7 +205,6 @@ class WorldManager:
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
-                # Change status to new for re-adding
                 model["status"] = "new"
 
             if model["status"] == "new":
@@ -215,10 +213,10 @@ class WorldManager:
                 sdf_compact = ' '.join(sdf_escaped.split())
                 request_str = f'sdf: "{sdf_compact}"'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/create",
-                       "--reqtype", f"{reqtype_prefix}.EntityFactory",
-                       "--reptype", f"{reqtype_prefix}.Boolean",
-                       "--timeout", "3000",
-                       "--req", request_str]
+                    "--reqtype", f"{reqtype_prefix}.EntityFactory",
+                    "--reptype", f"{reqtype_prefix}.Boolean",
+                    "--timeout", "3000",
+                    "--req", request_str]
                 print("Executing command:", " ".join(cmd))
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 print("Result stdout:", result.stdout)
@@ -236,10 +234,10 @@ class WorldManager:
             elif model["status"] == "removed":
                 request_str = f'name: "{model["name"]}", type: 2'
                 cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
-                       "--reqtype", f"{reqtype_prefix}.Entity",
-                       "--reptype", f"{reqtype_prefix}.Boolean",
-                       "--timeout", "3000",
-                       "--req", request_str]
+                    "--reqtype", f"{reqtype_prefix}.Entity",
+                    "--reptype", f"{reqtype_prefix}.Boolean",
+                    "--timeout", "3000",
+                    "--req", request_str]
                 print("Executing command:", " ".join(cmd))
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 print("Result stdout:", result.stdout)
@@ -251,7 +249,6 @@ class WorldManager:
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
 
-        # Generate and run motion script if there are dynamic models
         dynamic_models = [m for m in self.models if "motion" in m["properties"]]
         if dynamic_models:
             move_code_dir = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code")
@@ -266,7 +263,7 @@ class WorldManager:
                     f.write('from gz.transport13 import Node\n')
                     f.write('from gz.msgs10.pose_pb2 import Pose\n')
                     f.write('from gz.msgs10.boolean_pb2 import Boolean\n\n')
-                else:  # Fortress
+                else:
                     f.write('import subprocess\n\n')
                 f.write(f'prefix = "{"ign" if self.version == "fortress" else "gz"}\"\n')
                 f.write(f'reqtype_prefix = "{"ignition.msgs" if self.version == "fortress" else "gz.msgs"}\"\n')
@@ -275,14 +272,14 @@ class WorldManager:
                     f.write('node = Node()\n\n')
                     f.write('def set_pose(model_name, x, y, z):\n')
                     f.write('    req = Pose()\n')
-                    f.write('    req.name = model_name\n')  # Note: In gz-msgs10, it's req.name, not req.name()
+                    f.write('    req.name = model_name\n')
                     f.write('    req.position.x = x\n')
                     f.write('    req.position.y = y\n')
                     f.write('    req.position.z = z\n')
                     f.write('    req.orientation.w = 1.0\n')
                     f.write('    success, rep = node.request(f"/world/{world_name}/set_pose", req, Pose, Boolean, 500)\n')
                     f.write('    return success\n\n')
-                else:  # Fortress subprocess version
+                else:
                     f.write('def set_pose(model_name, x, y, z):\n')
                     f.write('    request_str = f\'name: "{model_name}", position {{ x: {x} y: {y} z: {z} }}, orientation {{ w: 1 }}\'\n')
                     f.write('    cmd = [prefix, "service", "-s", f"/world/{world_name}/set_pose", "--reqtype", f"{reqtype_prefix}.Pose", "--reptype", f"{reqtype_prefix}.Boolean", "--timeout", "500", "--req", request_str]\n')
@@ -305,12 +302,12 @@ class WorldManager:
                         state = {'current_segment': 0, 't': 0.0, 'path': [list(p) for p in motion["path"]], 'z': z}
                     f.write(f'motions["{m["name"]}"] = {motion}\n')
                     f.write(f'states["{m["name"]}"] = {state}\n')
-                f.write('\ndt = 0.005\nwhile True:\n')
+                f.write('\ndt = 0.005\nlinear_dt = 0.001\nwhile True:\n')
                 f.write('    try:\n')
                 f.write('        for model_name, motion in motions.items():\n')
                 f.write('            state = states[model_name]\n')
-                f.write('            velocity = random.gauss(motion["velocity"], motion["std"])\n')
-                f.write('            delta = velocity * dt\n')
+                f.write('            velocity = max(min(random.gauss(motion["velocity"], motion["std"]), motion["velocity"] * 2), 0)\n')
+                f.write('            delta = velocity * (linear_dt if motion["type"] == "linear" else dt)\n')
                 f.write('            if motion["type"] == "linear":\n')
                 f.write('                start = state["start"]\n')
                 f.write('                end = state["end"]\n')
@@ -322,16 +319,18 @@ class WorldManager:
                 f.write('                unit_y = dy / length\n')
                 f.write('                new_x = state["current_pos"][0] + delta * state["direction"] * unit_x\n')
                 f.write('                new_y = state["current_pos"][1] + delta * state["direction"] * unit_y\n')
-                f.write('                dist_to_end = math.hypot(new_x - end[0], new_y - end[1])\n')
-                f.write('                dist_to_start = math.hypot(new_x - start[0], new_y - start[1])\n')
-                f.write('                if state["direction"] > 0 and dist_to_end < 0.01:\n')
+                f.write('                t = ((new_x - start[0]) * dx + (new_y - start[1]) * dy) / (length**2)\n')
+                f.write('                if t > 1:\n')
                 f.write('                    new_x = end[0]\n')
                 f.write('                    new_y = end[1]\n')
                 f.write('                    state["direction"] = -state["direction"]\n')
-                f.write('                elif state["direction"] < 0 and dist_to_start < 0.01:\n')
+                f.write('                elif t < 0:\n')
                 f.write('                    new_x = start[0]\n')
                 f.write('                    new_y = start[1]\n')
                 f.write('                    state["direction"] = -state["direction"]\n')
+                f.write('                else:\n')
+                f.write('                    new_x = start[0] + t * dx\n')
+                f.write('                    new_y = start[1] + t * dy\n')
                 f.write('                state["current_pos"] = [new_x, new_y]\n')
                 f.write('                if not set_pose(model_name, new_x, new_y, state["z"]):\n')
                 f.write('                    print(f"Stopping script as set_pose failed for {model_name}")\n')
@@ -357,7 +356,7 @@ class WorldManager:
                 f.write('                while state["t"] >= 1:\n')
                 f.write('                    state["t"] -= 1\n')
                 f.write('                    state["current_segment"] = (state["current_segment"] + 1) % len(path)\n')
-                f.write('                start = path[state["current_segment"]]\n')  # Recalculate here
+                f.write('                start = path[state["current_segment"]]\n')
                 f.write('                end = path[(state["current_segment"] + 1) % len(path)]\n')
                 f.write('                dx = end[0] - start[0]\n')
                 f.write('                dy = end[1] - start[1]\n')
@@ -366,13 +365,12 @@ class WorldManager:
                 f.write('                if not set_pose(model_name, x, y, state["z"]):\n')
                 f.write('                    print(f"Stopping script as set_pose failed for {model_name}")\n')
                 f.write('                    exit(1)\n')
-                f.write('        time.sleep(dt)\n')
+                f.write('        time.sleep(linear_dt if motion["type"] == "linear" else dt)\n')
                 f.write('    except KeyboardInterrupt:\n')
                 f.write('        print("Motion script interrupted")\n')
                 f.write('        exit(0)\n')
             os.chmod(script_path, 0o755)
 
-            # Generate launch script for direct running with motion
             launch_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code", f"{self.world_name}_launch.sh")
             with open(launch_path, 'w') as f:
                 f.write('#!/bin/bash\n')
@@ -385,14 +383,12 @@ class WorldManager:
                 f.write('wait\n')
             os.chmod(launch_path, 0o755)
 
-            # Terminate any existing script process before starting a new one
             if self.script_process and self.script_process.poll() is None:
                 self.script_process.terminate()
                 try:
                     self.script_process.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     self.script_process.kill()
-            # Run the script and store the process
             self.script_process = subprocess.Popen(['python3', script_path])
 
         self.models = [m for m in self.models if m["status"] != "removed"]

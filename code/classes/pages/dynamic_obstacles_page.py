@@ -212,8 +212,22 @@ class DynamicObstaclesPage(QWizardPage):
         try:
             velocity = float(self.velocity_input.text() or 1.0)
             std = float(self.std_input.text() or 0.1)
-        except ValueError:
-            QMessageBox.warning(self, "Invalid Input", "Please enter valid velocity and std.")
+            if velocity <= 0:
+                raise ValueError("Velocity must be positive.")
+            if std < 0:
+                raise ValueError("Standard deviation must be non-negative.")
+            if self.current_motion_type == "linear" and len(self.points) == 2:
+                start = self.points[0]
+                end = self.points[1]
+                length = math.hypot((end.x() - start.x()) / 100, (end.y() - start.y()) / 100)
+                max_velocity = length / 0.001 * 0.5
+                if velocity > max_velocity:
+                    QMessageBox.warning(self, "Invalid Velocity",
+                                        f"Velocity {velocity} m/s is too high for a linear path of length {length:.2f} m. "
+                                        f"Recommended maximum velocity is {max_velocity:.2f} m/s.")
+                    return
+        except ValueError as e:
+            QMessageBox.warning(self, "Invalid Input", f"Please enter valid velocity and std: {str(e)}")
             return
         model = next(m for m in self.world_manager.models if m["name"] == self.current_obstacle)
         motion = {"type": self.current_motion_type, "velocity": velocity, "std": std}
