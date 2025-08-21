@@ -1,4 +1,5 @@
 def get_color(color_name):
+    # Map color names to RGB tuples
     colors = {
         "Black": (0, 0, 0),
         "Gray": (0.5, 0.5, 0.5),
