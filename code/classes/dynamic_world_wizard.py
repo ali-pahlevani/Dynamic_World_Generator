@@ -1,4 +1,5 @@
 from PyQt5.QtWidgets import QWizard, QListWidget, QVBoxLayout, QWidget, QGraphicsScene, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsTextItem
+from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt, QRectF, QLineF, QPointF, pyqtProperty
 from PyQt5.QtGui import QFont, QPen, QColor
 from classes.world_manager import WorldManager
@@ -15,6 +16,8 @@ class DynamicWorldWizard(QWizard):
     def __init__(self):
         # Initialize wizard with window settings and navigation
         super().__init__()
+        QApplication.instance().main_window = self
+        
         self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
         self.setWindowTitle("Dynamic World Generator Wizard (V1)")
         self.resize(1600, 800)
@@ -206,6 +209,7 @@ class DynamicWorldWizard(QWizard):
         # Clean up world manager on window close
         if self.world_manager:
             self.world_manager.cleanup()
+        print("Wizard finished")
         event.accept()
 
     def initialize_world_manager(self, sim_type, version):

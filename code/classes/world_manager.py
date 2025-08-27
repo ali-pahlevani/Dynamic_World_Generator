@@ -5,6 +5,8 @@ import math
 from xml.etree import ElementTree as ET
 from utils.color_utils import get_color
 from utils.config import PROJECT_ROOT, WORLDS_GAZEBO_DIR
+from utils.misc_utils import gazebo_not_installed_notice 
+
 
 class WorldManager:
     def __init__(self, simulation, version):
@@ -32,7 +34,12 @@ class WorldManager:
             cmd = ["ign", "gazebo", empty_world_path]
         else:
             cmd = ["gz", "sim", empty_world_path]
-        self.process = subprocess.Popen(cmd)
+        
+        try:
+            self.process = subprocess.Popen(cmd)
+        except:
+            gazebo_not_installed_notice()    
+    
         self.world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, f"{world_name}.sdf")
         self.models = []
         self.sdf_tree = ET.parse(empty_world_path)
@@ -50,7 +57,11 @@ class WorldManager:
             cmd = ["ign", "gazebo", self.world_path]
         else:
             cmd = ["gz", "sim", self.world_path]
-        self.process = subprocess.Popen(cmd)
+        
+        try:
+            self.process = subprocess.Popen(cmd)
+        except:
+            gazebo_not_installed_notice()    
 
         self.sdf_tree = ET.parse(self.world_path)
         self.sdf_root = self.sdf_tree.getroot()
@@ -178,14 +189,15 @@ class WorldManager:
         self.models.append(model)
 
     def apply_changes(self):
-        # Apply model changes to the simulation and SDF
-        if not self.process or self.process.poll() is not None:
-            raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
-
-        time.sleep(2)
 
         prefix = "ign" if self.version == "fortress" else "gz"
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
+
+        # Apply model changes to the simulation and SDF
+        if not self.process or self.process.poll() is not None:
+            # let SDF generating without runtime Gazebo
+            pass
+            # raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
 
         for model in self.models[:]:
             if model["status"] == "updated":
@@ -195,9 +207,13 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    continue
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        continue
+                except:
+                    # let SDF generating without runtime Gazebo
+                    pass
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
@@ -213,10 +229,14 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0 or "data: true" not in result.stdout:
-                    continue
-                time.sleep(1)
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0 or "data: true" not in result.stdout:
+                        continue
+                    time.sleep(1)
+                except:
+                    # let SDF generating without runtime Gazebo
+                    pass
                 sdf_snippet_file = self.generate_model_sdf(model, for_service=False)
                 model_elem = ET.fromstring(sdf_snippet_file)
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
@@ -230,9 +250,13 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    continue
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        continue
+                except:
+                    # let SDF generating without runtime Gazebo
+                    pass                
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
