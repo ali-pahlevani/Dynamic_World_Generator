@@ -209,7 +209,7 @@ class DynamicWorldWizard(QWizard):
         # Clean up world manager on window close
         if self.world_manager:
             self.world_manager.cleanup()
-        print("Wizard finished")
+        print("Custom world wizard finished")
         event.accept()
 
     def initialize_world_manager(self, sim_type, version):
