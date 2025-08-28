@@ -2,10 +2,12 @@ import os
 import subprocess
 import time
 import math
+from pathlib import Path
 from xml.etree import ElementTree as ET
 from utils.color_utils import get_color
 from utils.config import PROJECT_ROOT, WORLDS_GAZEBO_DIR
 from utils.misc_utils import gazebo_not_installed_notice 
+
 
 
 class WorldManager:
@@ -16,12 +18,19 @@ class WorldManager:
         self.sdf_version = "1.8" if version == "fortress" else "1.9"
         self.world_path = None
         self.world_name = None
+        self.worlds = []
         self.models = []
         self.sdf_tree = None
         self.sdf_root = None
         self.process = None
         self.script_process = None
         self.base_dir = PROJECT_ROOT
+        self.refresh_worlds_list()
+
+    def refresh_worlds_list(self):
+        worlds_sdf = Path(os.path.join(PROJECT_ROOT, "worlds/gazebo/" + self.version)).glob('*.sdf')
+        worlds_sdf_list = [Path(file.name).stem for file in worlds_sdf]
+        self.worlds = worlds_sdf_list
 
     def create_new_world(self, world_name):
         # Create a new world from empty template
@@ -194,10 +203,10 @@ class WorldManager:
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
 
         # Apply model changes to the simulation and SDF
+        
+        gazebo_runtime:bool = True
         if not self.process or self.process.poll() is not None:
-            # let SDF generating without runtime Gazebo
-            pass
-            # raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
+            gazebo_runtime = False
 
         for model in self.models[:]:
             if model["status"] == "updated":
@@ -399,7 +408,8 @@ class WorldManager:
                     self.script_process.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     self.script_process.kill()
-            self.script_process = subprocess.Popen(['python3', script_path])
+            if gazebo_runtime:
+                self.script_process = subprocess.Popen(['python3', script_path])
 
         self.models = [m for m in self.models if m["status"] != "removed"]
         for model in self.models:

@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWizardPage, QHBoxLayout, QVBoxLayout, QPushButton, QLineEdit, QListWidget, QMessageBox, QWidget
+from PyQt5.QtWidgets import QLabel, QWizardPage, QHBoxLayout, QVBoxLayout, QPushButton, QLineEdit, QListWidget, QMessageBox, QWidget
 from PyQt5.QtCore import Qt, QEvent, QPointF
 from PyQt5.QtGui import QColor
 from classes.zoomable_graphics_view import ZoomableGraphicsView
@@ -13,9 +13,12 @@ class WallsDesignPage(QWizardPage):
         super().__init__()
         self.setTitle("Design Walls")
         self.registerField("world_name", self)
+        self.registerField("world_list", self)
         self.registerField("wall_list", self)
         self.world_manager = None
         self.scene = scene
+
+        self.world_list = QListWidget()
 
         # Setup main layout with left panel and canvas
         layout = QHBoxLayout()
@@ -35,6 +38,13 @@ class WallsDesignPage(QWizardPage):
         self.world_name_input.setPlaceholderText("World Name")
         left_layout.addWidget(self.world_name_input)
 
+        worlds_label = QLabel("Worlds:")
+        left_layout.addWidget(worlds_label)
+        left_layout.addWidget(self.world_list)
+        self.world_list.itemSelectionChanged.connect(self.update_world_name)       
+
+        walls_label = QLabel("Walls:")
+        left_layout.addWidget(walls_label)
         self.wall_list = QListWidget()
         left_layout.addWidget(self.wall_list)
 
@@ -79,6 +89,7 @@ class WallsDesignPage(QWizardPage):
     def initializePage(self):
         # Set world manager from wizard
         self.world_manager = self.wizard().world_manager
+        self.refresh_worlds_list()
 
     def snap_to_grid(self, point, grid_spacing=10):
         # Snap point to grid for wall placement
@@ -115,6 +126,11 @@ class WallsDesignPage(QWizardPage):
                     del self.start_point
                 return True
         return super().eventFilter(obj, event)
+    
+    def update_world_name(self):
+        selected_items = self.world_list.selectedItems()
+        if selected_items:
+            self.world_name_input.setText(selected_items[0].text()) 
 
     def create_new_world(self):
         # Create a new world from empty template
@@ -141,6 +157,7 @@ class WallsDesignPage(QWizardPage):
             tree.write(new_world_path, encoding="utf-8", xml_declaration=True)
             self.world_manager.load_world(world_name)
             self.wall_list.clear()
+            self.refresh_worlds_list()
             self.wizard().refresh_canvas(self.scene)
             QMessageBox.information(self, "Success", f"Created and loaded new world: {world_name}")
             self.completeChanged.emit()
@@ -157,6 +174,7 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.warning(self, "Error", "Please enter a valid world name.")
             return
         try:
+            self.refresh_worlds_list()
             self.world_manager.load_world(world_name)
             self.wall_list.clear()
             self.wizard().refresh_canvas(self.scene)
@@ -169,6 +187,12 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.critical(self, "Error", str(e))
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load world: {str(e)}")
+
+    def refresh_worlds_list(self):
+        self.world_list.clear()
+        self.world_manager.refresh_worlds_list()
+        for world in self.world_manager.worlds:
+            self.world_list.addItem(world)
 
     def remove_selected_wall(self):
         # Remove selected wall from scene and world
