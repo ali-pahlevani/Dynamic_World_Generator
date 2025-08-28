@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.8">
-  <world name="empty">
+  <world name="empty_world">
     <physics type="ode">
       <max_step_size>0.004</max_step_size>
       <real_time_factor>1.0</real_time_factor>
@@ -312,6 +312,7 @@
           </material>
         </visual>
       </link>
+      <pose>0 0 0 0 -0 0</pose>
     </model>
   </world>
 </sdf>
