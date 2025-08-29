@@ -409,7 +409,20 @@ class WorldManager:
                 except subprocess.TimeoutExpired:
                     self.script_process.kill()
             if gazebo_runtime:
-                self.script_process = subprocess.Popen(['python3', script_path])
+                
+                # Add system python path (where python packages installed by apt) to env
+                # for cases when dwg_wizzard run from outer app
+                my_env = os.environ.copy()
+                system_python_path = '/usr/lib/python3/dist-packages'
+                # check python path
+                if 'PYTHONPATH' not in my_env or system_python_path not in my_env['PYTHONPATH'].split(os.pathsep):
+                    # add path
+                    if 'PYTHONPATH' in my_env:
+                        my_env['PYTHONPATH'] += os.pathsep + system_python_path
+                    else:
+                        my_env['PYTHONPATH'] = system_python_path
+
+                self.script_process = subprocess.Popen(['python3', script_path], env=my_env)
 
         self.models = [m for m in self.models if m["status"] != "removed"]
         for model in self.models:
