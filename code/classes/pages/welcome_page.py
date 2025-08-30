@@ -8,7 +8,6 @@ class WelcomePage(QWizardPage):
     def __init__(self):
         # Initialize wizard page with title
         super().__init__()
-        self.setTitle("Let's make a 'Dynamic World' together!")
 
         # Create main layout for vertical centering
         main_layout = QVBoxLayout()
@@ -20,7 +19,7 @@ class WelcomePage(QWizardPage):
 
         # Add title label
         title_label = QLabel("Welcome to the Dynamic World Generator Wizard!")
-        title_label.setStyleSheet("font-size: 26pt; font-weight: bold; color: red;")
+        title_label.setStyleSheet("font-size: 24pt; font-weight: bold;")
         title_label.setAlignment(Qt.AlignCenter)
         content_layout.addWidget(title_label)
 
