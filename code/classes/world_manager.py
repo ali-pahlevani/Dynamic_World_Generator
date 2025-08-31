@@ -2,9 +2,13 @@ import os
 import subprocess
 import time
 import math
+from pathlib import Path
 from xml.etree import ElementTree as ET
 from utils.color_utils import get_color
 from utils.config import PROJECT_ROOT, WORLDS_GAZEBO_DIR
+from utils.misc_utils import gazebo_not_installed_notice 
+
+
 
 class WorldManager:
     def __init__(self, simulation, version):
@@ -14,12 +18,19 @@ class WorldManager:
         self.sdf_version = "1.8" if version == "fortress" else "1.9"
         self.world_path = None
         self.world_name = None
+        self.worlds = []
         self.models = []
         self.sdf_tree = None
         self.sdf_root = None
         self.process = None
         self.script_process = None
         self.base_dir = PROJECT_ROOT
+        self.refresh_worlds_list()
+
+    def refresh_worlds_list(self):
+        worlds_sdf = Path(os.path.join(PROJECT_ROOT, "worlds/gazebo/" + self.version)).glob('*.sdf')
+        worlds_sdf_list = [Path(file.name).stem for file in worlds_sdf]
+        self.worlds = worlds_sdf_list
 
     def create_new_world(self, world_name):
         # Create a new world from empty template
@@ -32,7 +43,12 @@ class WorldManager:
             cmd = ["ign", "gazebo", empty_world_path]
         else:
             cmd = ["gz", "sim", empty_world_path]
-        self.process = subprocess.Popen(cmd)
+        
+        try:
+            self.process = subprocess.Popen(cmd)
+        except:
+            gazebo_not_installed_notice()    
+    
         self.world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, f"{world_name}.sdf")
         self.models = []
         self.sdf_tree = ET.parse(empty_world_path)
@@ -50,7 +66,11 @@ class WorldManager:
             cmd = ["ign", "gazebo", self.world_path]
         else:
             cmd = ["gz", "sim", self.world_path]
-        self.process = subprocess.Popen(cmd)
+        
+        try:
+            self.process = subprocess.Popen(cmd)
+        except:
+            gazebo_not_installed_notice()    
 
         self.sdf_tree = ET.parse(self.world_path)
         self.sdf_root = self.sdf_tree.getroot()
@@ -178,14 +198,15 @@ class WorldManager:
         self.models.append(model)
 
     def apply_changes(self):
-        # Apply model changes to the simulation and SDF
-        if not self.process or self.process.poll() is not None:
-            raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
-
-        time.sleep(2)
 
         prefix = "ign" if self.version == "fortress" else "gz"
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
+
+        # Apply model changes to the simulation and SDF
+        
+        gazebo_runtime:bool = True
+        if not self.process or self.process.poll() is not None:
+            gazebo_runtime = False
 
         for model in self.models[:]:
             if model["status"] == "updated":
@@ -195,9 +216,13 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    continue
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        continue
+                except:
+                    # let SDF generating without runtime Gazebo
+                    pass
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
@@ -213,10 +238,14 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0 or "data: true" not in result.stdout:
-                    continue
-                time.sleep(1)
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0 or "data: true" not in result.stdout:
+                        continue
+                    time.sleep(1)
+                except:
+                    # let SDF generating without runtime Gazebo
+                    pass
                 sdf_snippet_file = self.generate_model_sdf(model, for_service=False)
                 model_elem = ET.fromstring(sdf_snippet_file)
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
@@ -230,9 +259,13 @@ class WorldManager:
                     "--reptype", f"{reqtype_prefix}.Boolean",
                     "--timeout", "3000",
                     "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    continue
+                try:
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        continue
+                except:
+                    # let SDF generating without runtime Gazebo
+                    pass                
                 for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
@@ -375,7 +408,21 @@ class WorldManager:
                     self.script_process.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     self.script_process.kill()
-            self.script_process = subprocess.Popen(['python3', script_path])
+            if gazebo_runtime:
+                
+                # Add system python path (where python packages installed by apt) to env
+                # for cases when dwg_wizzard run from outer app
+                my_env = os.environ.copy()
+                system_python_path = '/usr/lib/python3/dist-packages'
+                # check python path
+                if 'PYTHONPATH' not in my_env or system_python_path not in my_env['PYTHONPATH'].split(os.pathsep):
+                    # add path
+                    if 'PYTHONPATH' in my_env:
+                        my_env['PYTHONPATH'] += os.pathsep + system_python_path
+                    else:
+                        my_env['PYTHONPATH'] = system_python_path
+
+                self.script_process = subprocess.Popen(['python3', script_path], env=my_env)
 
         self.models = [m for m in self.models if m["status"] != "removed"]
         for model in self.models:
