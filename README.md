@@ -77,14 +77,12 @@ Dynamic_World_Generator/
 * **Gazebo**: Install *Gazebo Harmonic* (recommended) or *Fortress*:
   * For *Harmonic* (*Ubuntu*/*Debian*), please visit:
     [https://gazebosim.org/docs/harmonic/install_ubuntu/](https://gazebosim.org/docs/harmonic/install_ubuntu/)
-
+    ```
+    python packages: gz-transport13, gz-msgs10 will be autoinstalled by Gazebo via apt. Alternatively you can install it via conda.
+    ```
   * For *Fortress*, please visit:
     [https://gazebosim.org/docs/fortress/install_ubuntu/](https://gazebosim.org/docs/fortress/install_ubuntu/)
 
-  * For *Harmonic*, also install transport libraries:
-    ```bash
-    pip install gz-transport13 gz-msgs10
-    ```
 * **Images and Worlds**: Ensure the `images/intro/`, `images/future/`, and `worlds/gazebo/{version}/empty_world.sdf` directories exist in the project root.
 
 ### Setup
