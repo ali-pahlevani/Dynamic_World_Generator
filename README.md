@@ -6,7 +6,7 @@
 
 The wizard guides users through a step-by-step process, ensuring an intuitive experience. It supports creating new worlds from empty templates, loading existing ones, and applying changes in real-time to *Gazebo*.
 
-🙏 A special thanks to Professor Sousso KELOUWANI for his excellent idea that inspired the creation of this application.
+🙏 A special thanks to **Professor Sousso KELOUWANI** for his excellent idea that inspired the creation of this application.
 
 ## Key Features
 
