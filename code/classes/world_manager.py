@@ -24,6 +24,8 @@ class WorldManager:
         self.process = None
         self.script_process = None
         self.base_dir = PROJECT_ROOT
+        self._gazebo_ready = False
+        self._process_start_time = 0.0
 
     def create_new_world(self, world_name):
         self.world_name = world_name
@@ -47,6 +49,8 @@ class WorldManager:
 
         cmd = ["ign", "gazebo", self.world_path] if self.version == "fortress" else ["gz", "sim", self.world_path]
         self.process = subprocess.Popen(cmd)
+        self._process_start_time = time.time()
+        self._gazebo_ready = False
 
         self.sdf_tree = ET.parse(self.world_path)
         self.sdf_root = self.sdf_tree.getroot()
@@ -188,7 +192,18 @@ class WorldManager:
 
         prefix = "ign" if self.version == "fortress" else "gz"
         print(f"[DWG] apply_changes — world='{self.world_name}' version={self.version}")
-        self._wait_for_gazebo_ready(prefix)
+        if not self._gazebo_ready:
+            # `gz service --list` is unreliable for discovery (multicast may
+            # never return the world service even when it is running).  A
+            # simple elapsed-time guard is more predictable: Gazebo needs ~4 s
+            # to register its transport services after startup.  If the user
+            # took longer than that to draw objects, no sleep is needed.
+            elapsed = time.time() - self._process_start_time
+            wait = max(0.0, 4.0 - elapsed)
+            if wait > 0.05:
+                print(f"[DWG] Waiting {wait:.1f}s for Gazebo services to register …")
+                time.sleep(wait)
+            self._gazebo_ready = True
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
         SERVICE_TIMEOUT = "5000"
 
@@ -436,26 +451,6 @@ class WorldManager:
         n_err = len(errors)
         print(f"[DWG] apply_changes done — {n_ok} applied, {n_err} failed")
         return errors
-
-    def _wait_for_gazebo_ready(self, prefix, timeout=20):
-        """Poll until Gazebo registers the world service, with a printed countdown."""
-        service_path = f"/world/{self.world_name}/create"
-        print(f"[DWG] Waiting for Gazebo service '{service_path}' (max {timeout}s) …")
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            try:
-                r = subprocess.run(
-                    [prefix, "service", "--list"],
-                    capture_output=True, text=True, timeout=2,
-                )
-                if service_path in r.stdout:
-                    elapsed = timeout - (deadline - time.time())
-                    print(f"[DWG] Gazebo ready after {elapsed:.1f}s")
-                    return
-            except (subprocess.TimeoutExpired, FileNotFoundError):
-                pass
-            time.sleep(0.5)
-        print(f"[DWG] WARNING: service not found after {timeout}s — proceeding anyway")
 
     def cleanup(self):
         if self.sdf_tree and self.world_path:
