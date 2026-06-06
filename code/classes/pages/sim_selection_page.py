@@ -4,17 +4,16 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from utils.config import INTRO_IMAGES_DIR
 import os
 
+
 class SimSelectionPage(QWizardPage):
     simulationSelected = pyqtSignal(str, str)
 
     def __init__(self):
-        # Initialize wizard page with title and hidden fields
         super().__init__()
         self.setTitle("Select Simulation Platform")
         self._simulation = ""
         self._gazebo_version = ""
 
-        # Register hidden fields for simulation and version
         self.simulation_field = QLineEdit()
         self.simulation_field.setVisible(False)
         self.gazebo_version_field = QLineEdit()
@@ -22,14 +21,11 @@ class SimSelectionPage(QWizardPage):
         self.registerField("simulation*", self.simulation_field)
         self.registerField("gazebo_version", self.gazebo_version_field)
 
-        # Setup main layout with Gazebo and Isaac Sim sections
         layout = QHBoxLayout()
 
-        # Gazebo section with Harmonic and Fortress options
         gazebo_widget = QWidget()
         gazebo_layout = QVBoxLayout()
 
-        # Harmonic option
         harmonic_widget = QWidget()
         harmonic_layout = QVBoxLayout()
         harmonic_label = QLabel("Gazebo Harmonic (Recommended)")
@@ -58,13 +54,11 @@ class SimSelectionPage(QWizardPage):
         harmonic_widget.setLayout(harmonic_layout)
         gazebo_layout.addWidget(harmonic_widget)
 
-        # Horizontal separator
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
         separator.setFrameShadow(QFrame.Sunken)
         gazebo_layout.addWidget(separator)
 
-        # Fortress option
         fortress_widget = QWidget()
         fortress_layout = QVBoxLayout()
         fortress_label = QLabel("Gazebo Fortress")
@@ -97,13 +91,11 @@ class SimSelectionPage(QWizardPage):
         gazebo_widget.setLayout(gazebo_layout)
         layout.addWidget(gazebo_widget, stretch=1)
 
-        # Vertical divider
         divider = QFrame()
         divider.setFrameShape(QFrame.VLine)
         divider.setFrameShadow(QFrame.Sunken)
         layout.addWidget(divider, stretch=0)
 
-        # Isaac Sim section (disabled)
         isaac_widget = QWidget()
         isaac_layout = QVBoxLayout()
         isaac_layout.addStretch(1)
@@ -135,7 +127,6 @@ class SimSelectionPage(QWizardPage):
 
         self.setLayout(layout)
 
-        # Apply button stylesheets
         button_style = """
             QPushButton {
                 background-color: #4A90E2;
@@ -160,7 +151,6 @@ class SimSelectionPage(QWizardPage):
         """)
 
     def select_gazebo_version(self, version):
-        # Select Gazebo version and emit signal
         self._simulation = "gazebo"
         self._gazebo_version = version
         self.simulation_field.setText("gazebo")
@@ -169,5 +159,4 @@ class SimSelectionPage(QWizardPage):
         self.completeChanged.emit()
 
     def isComplete(self):
-        # Check if a valid simulation and version are selected
         return self._simulation == "gazebo" and self._gazebo_version in ["fortress", "harmonic"]

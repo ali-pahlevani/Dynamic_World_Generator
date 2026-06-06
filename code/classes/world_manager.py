@@ -1,4 +1,5 @@
 import os
+import signal
 import subprocess
 import time
 import math
@@ -6,9 +7,9 @@ from xml.etree import ElementTree as ET
 from utils.color_utils import get_color
 from utils.config import PROJECT_ROOT, WORLDS_GAZEBO_DIR
 
+
 class WorldManager:
     def __init__(self, simulation, version):
-        # Initialize world manager with simulation and version
         self.simulation = simulation
         self.version = version
         self.sdf_version = "1.8" if version == "fortress" else "1.9"
@@ -22,16 +23,12 @@ class WorldManager:
         self.base_dir = PROJECT_ROOT
 
     def create_new_world(self, world_name):
-        # Create a new world from empty template
         self.world_name = world_name
         empty_world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, "empty_world.sdf")
         if not os.path.exists(empty_world_path):
             raise FileNotFoundError(f"Empty world file not found: {empty_world_path}")
 
-        if self.version == "fortress":
-            cmd = ["ign", "gazebo", empty_world_path]
-        else:
-            cmd = ["gz", "sim", empty_world_path]
+        cmd = ["ign", "gazebo", empty_world_path] if self.version == "fortress" else ["gz", "sim", empty_world_path]
         self.process = subprocess.Popen(cmd)
         self.world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, f"{world_name}.sdf")
         self.models = []
@@ -40,16 +37,12 @@ class WorldManager:
         self.world_name = self.sdf_root.find("world").get("name")
 
     def load_world(self, world_name):
-        # Load an existing world
         self.world_name = world_name
         self.world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, f"{world_name}.sdf")
         if not os.path.exists(self.world_path):
             raise FileNotFoundError(f"World file not found: {self.world_path}")
 
-        if self.version == "fortress":
-            cmd = ["ign", "gazebo", self.world_path]
-        else:
-            cmd = ["gz", "sim", self.world_path]
+        cmd = ["ign", "gazebo", self.world_path] if self.version == "fortress" else ["gz", "sim", self.world_path]
         self.process = subprocess.Popen(cmd)
 
         self.sdf_tree = ET.parse(self.world_path)
@@ -57,7 +50,6 @@ class WorldManager:
         self.world_name = self.sdf_root.find("world").get("name")
         self.models = []
 
-        # Map RGB values to color names
         rgb_to_color = {
             (0, 0, 0): "Black",
             (0.5, 0.5, 0.5): "Gray",
@@ -67,7 +59,6 @@ class WorldManager:
             (0, 1, 0): "Green"
         }
 
-        # Parse models from SDF
         for model_elem in self.sdf_root.findall(".//model"):
             name = model_elem.get("name")
             type_elem = model_elem.find("type")
@@ -86,15 +77,16 @@ class WorldManager:
                         model_type = "unknown"
 
             properties = {}
-            pose_str = model_elem.find("pose").text
-            pose = [float(x) for x in pose_str.split()]
+            pose_elem = model_elem.find("pose")
+            if pose_elem is None or not pose_elem.text:
+                continue
+            pose = [float(v) for v in pose_elem.text.split()]
             x, y, z, _, _, yaw = pose
 
-            # Parse color from material
             material = model_elem.find(".//material/diffuse")
             color_name = "Gray"
             if material is not None:
-                rgb = tuple(float(x) for x in material.text.split()[:3])
+                rgb = tuple(float(v) for v in material.text.split()[:3])
                 color_name = rgb_to_color.get(rgb, "Gray")
 
             geometry = model_elem.find(".//geometry")
@@ -106,13 +98,9 @@ class WorldManager:
                         length, width, height = size
                         dx = (length / 2) * math.cos(yaw)
                         dy = (length / 2) * math.sin(yaw)
-                        start_x = x - dx
-                        start_y = y - dy
-                        end_x = x + dx
-                        end_y = y + dy
                         properties = {
-                            "start": (start_x, start_y),
-                            "end": (end_x, end_y),
+                            "start": (x - dx, y - dy),
+                            "end": (x + dx, y + dy),
                             "width": width,
                             "height": height,
                             "color": color_name
@@ -139,7 +127,6 @@ class WorldManager:
                         "color": color_name
                     }
 
-            # Parse motion for dynamic obstacles
             motion_elem = model_elem.find(".//motion")
             if motion_elem is not None:
                 motion = {"type": motion_elem.find("type").text}
@@ -152,9 +139,9 @@ class WorldManager:
                 if motion["type"] in ["linear", "polygon"]:
                     path = []
                     for point_elem in motion_elem.findall("point"):
-                        x = float(point_elem.find("x").text)
-                        y = float(point_elem.find("y").text)
-                        path.append((x, y))
+                        px = float(point_elem.find("x").text)
+                        py = float(point_elem.find("y").text)
+                        path.append((px, py))
                     motion["path"] = path
                 elif motion["type"] == "elliptical":
                     motion["semi_major"] = float(motion_elem.find("semi_major").text)
@@ -170,7 +157,6 @@ class WorldManager:
             })
 
     def add_model(self, model):
-        # Add or update a model in the world
         for existing_model in self.models:
             if existing_model["name"] == model["name"]:
                 existing_model.update(model)
@@ -178,7 +164,6 @@ class WorldManager:
         self.models.append(model)
 
     def apply_changes(self):
-        # Apply model changes to the simulation and SDF
         if not self.process or self.process.poll() is not None:
             raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
 
@@ -196,11 +181,11 @@ class WorldManager:
                     "--timeout", "3000",
                     "--req", request_str]
                 result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    continue
-                for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
-                    self.sdf_root.find("world").remove(elem)
-                self.save_sdf(self.world_path)
+                if result.returncode == 0:
+                    for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
+                        self.sdf_root.find("world").remove(elem)
+                    self.save_sdf(self.world_path)
+                # Always fall through to creation regardless of deletion result
                 model["status"] = "new"
 
             if model["status"] == "new":
@@ -237,7 +222,6 @@ class WorldManager:
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
 
-        # Generate motion script for dynamic models
         dynamic_models = [m for m in self.models if "motion" in m["properties"]]
         if dynamic_models:
             move_code_dir = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code")
@@ -254,8 +238,10 @@ class WorldManager:
                     f.write('from gz.msgs10.boolean_pb2 import Boolean\n\n')
                 else:
                     f.write('import subprocess\n\n')
-                f.write(f'prefix = "{"ign" if self.version == "fortress" else "gz"}\"\n')
-                f.write(f'reqtype_prefix = "{"ignition.msgs" if self.version == "fortress" else "gz.msgs"}\"\n')
+                prefix_val = "ign" if self.version == "fortress" else "gz"
+                reqtype_val = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
+                f.write(f'prefix = "{prefix_val}"\n')
+                f.write(f'reqtype_prefix = "{reqtype_val}"\n')
                 f.write(f'world_name = "{self.world_name}"\n\n')
                 if self.version == "harmonic":
                     f.write('node = Node()\n\n')
@@ -350,12 +336,12 @@ class WorldManager:
                 f.write('                y = start[1] + state["t"] * dy\n')
                 f.write('                if not set_pose(model_name, x, y, state["z"]):\n')
                 f.write('                    exit(1)\n')
-                f.write('        time.sleep(linear_dt if motion["type"] == "linear" else dt)\n')
+                # Use linear_dt (smallest interval) so all motion types stay responsive
+                f.write('        time.sleep(linear_dt)\n')
                 f.write('    except KeyboardInterrupt:\n')
                 f.write('        exit(0)\n')
             os.chmod(script_path, 0o755)
 
-            # Generate launch script
             launch_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code", f"{self.world_name}_launch.sh")
             with open(launch_path, 'w') as f:
                 f.write('#!/bin/bash\n')
@@ -368,7 +354,6 @@ class WorldManager:
                 f.write('wait\n')
             os.chmod(launch_path, 0o755)
 
-            # Manage motion script process
             if self.script_process and self.script_process.poll() is None:
                 self.script_process.terminate()
                 try:
@@ -382,15 +367,12 @@ class WorldManager:
             model["status"] = ""
 
     def cleanup(self):
-        # Clean up processes and save world state
-        import signal
         if self.sdf_tree and self.world_path:
             try:
                 self.save_sdf(self.world_path)
             except Exception:
                 pass
 
-        # Terminate motion script process
         if self.script_process and self.script_process.poll() is None:
             try:
                 self.script_process.send_signal(signal.SIGINT)
@@ -406,7 +388,6 @@ class WorldManager:
                 pass
             self.script_process = None
 
-        # Terminate Gazebo process
         if self.process and self.process.poll() is None:
             try:
                 self.process.send_signal(signal.SIGINT)
@@ -423,7 +404,6 @@ class WorldManager:
             self.process = None
 
     def generate_model_sdf(self, model, for_service=False):
-        # Generate SDF snippet for a model
         model_type = model["type"]
         props = model["properties"]
         color_rgb = get_color(props["color"])
@@ -450,7 +430,7 @@ class WorldManager:
             elif model_type == "sphere":
                 size_str = f"{size[0]:.6f}"
 
-        static_str = "false" if "motion" in model["properties"] else "true"
+        static_str = "false" if "motion" in props else "true"
         sdf = f"""<model name='{model["name"]}'>
             <static>{static_str}</static>
             <type>{model_type}</type>
@@ -479,7 +459,7 @@ class WorldManager:
                         <diffuse>{color_rgb[0]} {color_rgb[1]} {color_rgb[2]} 1</diffuse>
                     </material>
                 </visual>"""
-        if not static_str == "true":
+        if static_str != "true":
             density = 1000.0
             if model_type in ["wall", "box"]:
                 w, l, h = map(float, size_str.split())
@@ -499,7 +479,7 @@ class WorldManager:
                 ixx = (2/5) * mass * r**2
                 iyy = ixx
                 izz = ixx
-            inertial_str = f"""<inertial>
+            sdf += f"""<inertial>
                 <mass>{mass:.6f}</mass>
                 <inertia>
                     <ixx>{ixx:.6f}</ixx><ixy>0</ixy><ixz>0</ixz>
@@ -507,7 +487,6 @@ class WorldManager:
                     <izz>{izz:.6f}</izz>
                 </inertia>
             </inertial>"""
-            sdf += inertial_str
             sdf += "<gravity>false</gravity>"
         sdf += """</link>"""
         if "motion" in props:
@@ -530,10 +509,6 @@ class WorldManager:
         return sdf
 
     def save_sdf(self, path):
-        # Save SDF file to disk
         if self.sdf_tree:
-            try:
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                self.sdf_tree.write(path, encoding="utf-8", xml_declaration=True)
-            except Exception as e:
-                raise
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            self.sdf_tree.write(path, encoding="utf-8", xml_declaration=True)
