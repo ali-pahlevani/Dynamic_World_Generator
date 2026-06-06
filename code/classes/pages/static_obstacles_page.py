@@ -3,20 +3,18 @@ from PyQt5.QtCore import Qt, QEvent, QPointF
 from PyQt5.QtGui import QColor
 from classes.zoomable_graphics_view import ZoomableGraphicsView
 
+
 class StaticObstaclesPage(QWizardPage):
     def __init__(self, scene):
-        # Initialize wizard page with title and layout
         super().__init__()
         self.setTitle("Add Static Obstacles")
         self.world_manager = None
         self.scene = scene
 
-        # Setup main layout with left panel and canvas
         layout = QHBoxLayout()
         left_widget = QWidget()
         left_layout = QVBoxLayout()
 
-        # Add controls to left panel
         self.obstacle_type_combo = QComboBox()
         self.obstacle_type_combo.addItems(["Box", "Cylinder", "Sphere"])
         self.obstacle_type_combo.currentTextChanged.connect(self.update_input_fields)
@@ -54,12 +52,10 @@ class StaticObstaclesPage(QWizardPage):
         left_layout.addWidget(self.apply_button)
         left_widget.setLayout(left_layout)
 
-        # Setup zoomable canvas
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
 
-        # Set size constraints for canvas and left panel
         window_width = 1500
         canvas_width = int(window_width * 0.7)
         self.view.setMinimumWidth(int(800 * 0.7))
@@ -71,11 +67,9 @@ class StaticObstaclesPage(QWizardPage):
         layout.addWidget(self.view)
         self.setLayout(layout)
 
-        # Initialize input fields based on obstacle type
         self.update_input_fields()
 
     def initializePage(self):
-        # Set world manager and refresh obstacles
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
@@ -83,7 +77,6 @@ class StaticObstaclesPage(QWizardPage):
         self.refresh_obstacles()
 
     def refresh_obstacles(self):
-        # Update obstacle list and canvas
         self.obstacle_list.clear()
         self.wizard().refresh_canvas(self.scene)
         for model in self.world_manager.models:
@@ -91,7 +84,6 @@ class StaticObstaclesPage(QWizardPage):
                 self.obstacle_list.addItem(model["name"])
 
     def update_input_fields(self):
-        # Enable/disable input fields based on obstacle type
         obstacle_type = self.obstacle_type_combo.currentText()
         if obstacle_type == "Box":
             self.width_input.setEnabled(True)
@@ -110,13 +102,18 @@ class StaticObstaclesPage(QWizardPage):
             self.radius_input.setEnabled(True)
 
     def snap_to_grid(self, point, grid_spacing=10):
-        # Snap point to grid for obstacle placement
         x = round(point.x() / grid_spacing) * grid_spacing
         y = round(point.y() / grid_spacing) * grid_spacing
         return QPointF(x, y)
 
+    def _next_obstacle_name(self, obstacle_type):
+        existing = {m["name"] for m in self.world_manager.models}
+        idx = 1
+        while f"{obstacle_type}_{idx}" in existing:
+            idx += 1
+        return f"{obstacle_type}_{idx}"
+
     def eventFilter(self, obj, event):
-        # Handle mouse clicks to add obstacles
         if obj == self.view and event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self.world_manager:
             clicked_point = self.view.mapToScene(event.pos())
             center = self.snap_to_grid(clicked_point)
@@ -138,7 +135,7 @@ class StaticObstaclesPage(QWizardPage):
                     size_m = (R,)
                     position_z = R
                 color = self.color_input.text() or "Gray"
-                obstacle_name = f"{obstacle_type}_{len(self.world_manager.models) + 1}"
+                obstacle_name = self._next_obstacle_name(obstacle_type)
                 x_m = center.x() / 100
                 y_m = -center.y() / 100
                 obstacle = {
@@ -160,7 +157,6 @@ class StaticObstaclesPage(QWizardPage):
         return super().eventFilter(obj, event)
 
     def remove_selected_obstacle(self):
-        # Remove selected obstacle from scene and world
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
             return
@@ -183,7 +179,6 @@ class StaticObstaclesPage(QWizardPage):
             self.obstacle_list.takeItem(self.obstacle_list.row(selected))
 
     def apply_changes(self):
-        # Apply changes to the world and refresh canvas
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
             return
@@ -195,5 +190,4 @@ class StaticObstaclesPage(QWizardPage):
             QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
 
     def isComplete(self):
-        # Check if world manager and world name are set
         return self.world_manager is not None and self.world_manager.world_name is not None

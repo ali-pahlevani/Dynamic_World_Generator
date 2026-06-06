@@ -7,22 +7,18 @@ import shutil
 from xml.etree import ElementTree as ET
 from utils.config import WORLDS_GAZEBO_DIR
 
+
 class WallsDesignPage(QWizardPage):
     def __init__(self, scene):
-        # Initialize wizard page with title and layout
         super().__init__()
         self.setTitle("Design Walls")
-        self.registerField("world_name", self)
-        self.registerField("wall_list", self)
         self.world_manager = None
         self.scene = scene
 
-        # Setup main layout with left panel and canvas
         layout = QHBoxLayout()
         left_widget = QWidget()
         left_layout = QVBoxLayout()
 
-        # Add buttons and input fields to left panel
         self.create_world_button = QPushButton("Create New World")
         self.create_world_button.clicked.connect(self.create_new_world)
         left_layout.addWidget(self.create_world_button)
@@ -59,12 +55,10 @@ class WallsDesignPage(QWizardPage):
         left_layout.addWidget(self.apply_button)
         left_widget.setLayout(left_layout)
 
-        # Setup zoomable canvas
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
 
-        # Set size constraints for canvas and left panel
         window_width = 1500
         canvas_width = int(window_width * 0.7)
         self.view.setMinimumWidth(int(800 * 0.7))
@@ -77,17 +71,21 @@ class WallsDesignPage(QWizardPage):
         self.setLayout(layout)
 
     def initializePage(self):
-        # Set world manager from wizard
         self.world_manager = self.wizard().world_manager
 
     def snap_to_grid(self, point, grid_spacing=10):
-        # Snap point to grid for wall placement
         x = round(point.x() / grid_spacing) * grid_spacing
         y = round(point.y() / grid_spacing) * grid_spacing
         return QPointF(x, y)
 
+    def _next_wall_name(self):
+        existing = {m["name"] for m in self.world_manager.models}
+        idx = 1
+        while f"wall_{idx}" in existing:
+            idx += 1
+        return f"wall_{idx}"
+
     def eventFilter(self, obj, event):
-        # Handle mouse clicks to add walls
         if obj == self.view and self.world_manager:
             if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
                 if not hasattr(self, 'start_point'):
@@ -96,7 +94,7 @@ class WallsDesignPage(QWizardPage):
                 else:
                     clicked_point = self.view.mapToScene(event.pos())
                     end_point = self.snap_to_grid(clicked_point)
-                    wall_name = f"wall_{len(self.world_manager.models) + 1}"
+                    wall_name = self._next_wall_name()
                     wall = {
                         "name": wall_name,
                         "type": "wall",
@@ -117,7 +115,6 @@ class WallsDesignPage(QWizardPage):
         return super().eventFilter(obj, event)
 
     def create_new_world(self):
-        # Create a new world from empty template
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
@@ -148,7 +145,6 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.critical(self, "Error", f"Failed to create world: {str(e)}")
 
     def load_world(self):
-        # Load an existing world
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
@@ -171,7 +167,6 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.critical(self, "Error", f"Failed to load world: {str(e)}")
 
     def remove_selected_wall(self):
-        # Remove selected wall from scene and world
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
@@ -190,7 +185,6 @@ class WallsDesignPage(QWizardPage):
             self.wall_list.takeItem(self.wall_list.row(selected))
 
     def apply_changes(self):
-        # Apply changes to the world and refresh canvas
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
@@ -202,5 +196,4 @@ class WallsDesignPage(QWizardPage):
             QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
 
     def isComplete(self):
-        # Check if world manager and world name are set
         return self.world_manager is not None and self.world_manager.world_name is not None
