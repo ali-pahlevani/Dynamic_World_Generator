@@ -151,6 +151,25 @@ class SimSelectionPage(QWizardPage):
         cards_row = QHBoxLayout()
         cards_row.setSpacing(20)
 
+        # Ionic card
+        ionic_img = os.path.join(INTRO_IMAGES_DIR, "ionic.png")
+        ionic_card, self.ionic_button = _make_card(
+            ionic_img, 220, 220,
+            "Gazebo Ionic",
+            "Select Ionic",
+            enabled=True,
+        )
+        self.ionic_button.clicked.connect(
+            lambda: self.select_gazebo_version("ionic"))
+        cards_row.addWidget(ionic_card)
+
+        # Vertical divider
+        div = QFrame()
+        div.setFrameShape(QFrame.VLine)
+        div.setFrameShadow(QFrame.Sunken)
+        div.setStyleSheet("color: #D5D8DC;")
+        cards_row.addWidget(div)
+
         # Harmonic card
         harmonic_img = os.path.join(INTRO_IMAGES_DIR, "harmonic.png")
         harmonic_card, self.harmonic_button = _make_card(
@@ -165,11 +184,11 @@ class SimSelectionPage(QWizardPage):
         cards_row.addWidget(harmonic_card)
 
         # Vertical divider
-        div = QFrame()
-        div.setFrameShape(QFrame.VLine)
-        div.setFrameShadow(QFrame.Sunken)
-        div.setStyleSheet("color: #D5D8DC;")
-        cards_row.addWidget(div)
+        div2 = QFrame()
+        div2.setFrameShape(QFrame.VLine)
+        div2.setFrameShadow(QFrame.Sunken)
+        div2.setStyleSheet("color: #D5D8DC;")
+        cards_row.addWidget(div2)
 
         # Fortress card
         fortress_img = os.path.join(INTRO_IMAGES_DIR, "fortress.jpeg")
@@ -182,24 +201,6 @@ class SimSelectionPage(QWizardPage):
         self.fortress_button.clicked.connect(
             lambda: self.select_gazebo_version("fortress"))
         cards_row.addWidget(fortress_card)
-
-        # Vertical divider
-        div2 = QFrame()
-        div2.setFrameShape(QFrame.VLine)
-        div2.setFrameShadow(QFrame.Sunken)
-        div2.setStyleSheet("color: #D5D8DC;")
-        cards_row.addWidget(div2)
-
-        # Isaac Sim card (disabled)
-        isaac_img = os.path.join(INTRO_IMAGES_DIR, "isaacsim_450_gray.png")
-        isaac_card, self.isaac_button = _make_card(
-            isaac_img, 220, 220,
-            "Isaac Sim",
-            "Coming Soon",
-            enabled=False,
-            badge="Under Development",
-        )
-        cards_row.addWidget(isaac_card)
 
         root_layout.addStretch(1)
         root_layout.addLayout(cards_row)
@@ -216,7 +217,7 @@ class SimSelectionPage(QWizardPage):
     # ── Card highlight helper ──────────────────────────────────────────────
 
     def _highlight_card(self, selected_btn):
-        for btn in (self.harmonic_button, self.fortress_button):
+        for btn in (self.ionic_button, self.harmonic_button, self.fortress_button):
             is_selected = (btn is selected_btn)
             parent = btn.parent()
             parent.setStyleSheet(
@@ -234,12 +235,14 @@ class SimSelectionPage(QWizardPage):
         self.simulation_field.setText("gazebo")
         self.gazebo_version_field.setText(version)
         self.simulationSelected.emit("gazebo", version)
-        self._highlight_card(
-            self.harmonic_button if version == "harmonic" else self.fortress_button
-        )
-        label = "Harmonic" if version == "harmonic" else "Fortress"
-        self.status_label.setText(f"✔  Gazebo {label} selected")
+        btn_map = {
+            "ionic": self.ionic_button,
+            "harmonic": self.harmonic_button,
+            "fortress": self.fortress_button,
+        }
+        self._highlight_card(btn_map[version])
+        self.status_label.setText(f"✔  Gazebo {version.capitalize()} selected")
         self.completeChanged.emit()
 
     def isComplete(self):
-        return self._simulation == "gazebo" and self._gazebo_version in ("fortress", "harmonic")
+        return self._simulation == "gazebo" and self._gazebo_version in ("fortress", "harmonic", "ionic")

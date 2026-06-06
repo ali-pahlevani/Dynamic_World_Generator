@@ -302,7 +302,7 @@ class DynamicWorldWizard(QWizard):
     # ── Helpers ────────────────────────────────────────────────────────────
 
     def initialize_world_manager(self, sim_type, version):
-        if sim_type == "gazebo" and version in ("fortress", "harmonic"):
+        if sim_type == "gazebo" and version in ("fortress", "harmonic", "ionic"):
             self.world_manager = WorldManager(sim_type, version)
         else:
             self.world_manager = None

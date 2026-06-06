@@ -15,7 +15,12 @@ class WorldManager:
     def __init__(self, simulation, version):
         self.simulation = simulation
         self.version = version
-        self.sdf_version = "1.8" if version == "fortress" else "1.9"
+        if version == "fortress":
+            self.sdf_version = "1.8"
+        elif version == "ionic":
+            self.sdf_version = "1.12"
+        else:
+            self.sdf_version = "1.9"
         self.world_path = None
         self.world_name = None
         self.models = []
@@ -316,6 +321,10 @@ class WorldManager:
                     f.write('from gz.transport13 import Node\n')
                     f.write('from gz.msgs10.pose_pb2 import Pose\n')
                     f.write('from gz.msgs10.boolean_pb2 import Boolean\n\n')
+                elif self.version == "ionic":
+                    f.write('from gz.transport14 import Node\n')
+                    f.write('from gz.msgs11.pose_pb2 import Pose\n')
+                    f.write('from gz.msgs11.boolean_pb2 import Boolean\n\n')
                 else:
                     f.write('import subprocess\n\n')
                 prefix_val = "ign" if self.version == "fortress" else "gz"
@@ -323,7 +332,7 @@ class WorldManager:
                 f.write(f'prefix = "{prefix_val}"\n')
                 f.write(f'reqtype_prefix = "{reqtype_val}"\n')
                 f.write(f'world_name = "{self.world_name}"\n\n')
-                if self.version == "harmonic":
+                if self.version in ("harmonic", "ionic"):
                     f.write('node = Node()\n\n')
                     f.write('def set_pose(model_name, x, y, z):\n')
                     f.write('    req = Pose()\n')

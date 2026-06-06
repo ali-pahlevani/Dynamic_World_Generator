@@ -106,16 +106,16 @@ class ComingSoonPage(QWizardPage):
         cards_row = QHBoxLayout()
         cards_row.setSpacing(20)
         cards_row.addWidget(_feature_card(
-            os.path.join(FUTURE_IMAGES_DIR, "ionic.png"),
-            300, 260, "Gazebo Ionic", badge="Planned"
-        ))
-        cards_row.addWidget(_feature_card(
             os.path.join(FUTURE_IMAGES_DIR, "isaacsim_450.png"),
             300, 260, "Isaac Sim 4.5.0", badge="In Progress"
         ))
         cards_row.addWidget(_feature_card(
             os.path.join(FUTURE_IMAGES_DIR, "isaacsim_500.png"),
             300, 260, "Isaac Sim 5.0.0", badge="Planned"
+        ))
+        cards_row.addWidget(_feature_card(
+            os.path.join(FUTURE_IMAGES_DIR, "isaacsim_510.png"),
+            300, 260, "Isaac Sim 5.1.0", badge="Planned"
         ))
         layout.addStretch(1)
         layout.addLayout(cards_row)
