@@ -1,20 +1,14 @@
 from PyQt5.QtWidgets import (
-    QWizardPage, QHBoxLayout, QVBoxLayout, QComboBox, QListWidget,
-    QPushButton, QLineEdit, QMessageBox, QGraphicsLineItem,
+    QWizardPage, QHBoxLayout, QVBoxLayout, QFormLayout, QComboBox,
+    QListWidget, QLineEdit, QMessageBox, QGraphicsLineItem,
     QGraphicsEllipseItem, QWidget, QGroupBox, QLabel, QSizePolicy,
 )
 from PyQt5.QtCore import Qt, QEvent, QPointF, QLineF, QRectF
 from PyQt5.QtGui import QPen, QColor
 from classes.zoomable_graphics_view import ZoomableGraphicsView
 from classes.apply_worker import ApplyWorker
+from classes.responsive_widgets import WrapButton, ButtonRow
 import math
-
-
-def _btn(text, role=None):
-    b = QPushButton(text)
-    if role:
-        b.setProperty("btnRole", role)
-    return b
 
 
 class DynamicObstaclesPage(QWizardPage):
@@ -55,28 +49,25 @@ class DynamicObstaclesPage(QWizardPage):
         mg_layout.addWidget(self.motion_type_combo)
         left_layout.addWidget(mtype_group)
 
-        # Parameters group
+        # Parameters group — QFormLayout keeps labels to the left of inputs
         params_group = QGroupBox("Motion Parameters")
-        pg_layout = QVBoxLayout(params_group)
+        pg_layout = QFormLayout(params_group)
         pg_layout.setSpacing(6)
-        pg_layout.addWidget(QLabel("Velocity (m/s)"))
+        pg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.velocity_input = QLineEdit()
         self.velocity_input.setPlaceholderText("1.0")
-        pg_layout.addWidget(self.velocity_input)
-        pg_layout.addWidget(QLabel("Velocity std dev"))
+        pg_layout.addRow("Velocity (m/s)", self.velocity_input)
         self.std_input = QLineEdit()
         self.std_input.setPlaceholderText("0.1")
-        pg_layout.addWidget(self.std_input)
-        self._lbl_sm = QLabel("Semi-major axis")
-        pg_layout.addWidget(self._lbl_sm)
+        pg_layout.addRow("Std dev", self.std_input)
+        self._lbl_sm = QLabel("Semi-major")
         self.semi_major_input = QLineEdit()
         self.semi_major_input.setPlaceholderText("1.0")
-        pg_layout.addWidget(self.semi_major_input)
-        self._lbl_sn = QLabel("Semi-minor axis")
-        pg_layout.addWidget(self._lbl_sn)
+        pg_layout.addRow(self._lbl_sm, self.semi_major_input)
+        self._lbl_sn = QLabel("Semi-minor")
         self.semi_minor_input = QLineEdit()
         self.semi_minor_input.setPlaceholderText("0.5")
-        pg_layout.addWidget(self.semi_minor_input)
+        pg_layout.addRow(self._lbl_sn, self.semi_minor_input)
         left_layout.addWidget(params_group)
 
         # Path definition group
@@ -87,20 +78,18 @@ class DynamicObstaclesPage(QWizardPage):
         self.status_label.setWordWrap(True)
         self.status_label.setStyleSheet("color: #7F8C8D; font-size: 9pt;")
         ph_layout.addWidget(self.status_label)
-        btn_row = QHBoxLayout()
-        self.start_button = _btn("Start Path")
+        self.start_button = WrapButton("Start Path")
         self.start_button.clicked.connect(self.start_path)
-        self.finish_button = _btn("Finish Path")
+        self.finish_button = WrapButton("Finish Path")
         self.finish_button.clicked.connect(self.finish_path)
-        btn_row.addWidget(self.start_button)
-        btn_row.addWidget(self.finish_button)
-        ph_layout.addLayout(btn_row)
+        ph_layout.addWidget(ButtonRow(self.start_button, self.finish_button))
         left_layout.addWidget(path_group)
 
         left_layout.addStretch(1)
 
-        self.apply_button = _btn("Apply and Preview", "success")
+        self.apply_button = WrapButton("Apply and Preview", "success")
         self.apply_button.clicked.connect(self.apply_changes)
+        self.apply_button.setMinimumHeight(36)
         left_layout.addWidget(self.apply_button)
 
         # ── Canvas ─────────────────────────────────────────────────

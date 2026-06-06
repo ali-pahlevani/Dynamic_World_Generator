@@ -1,11 +1,12 @@
 from PyQt5.QtWidgets import (
-    QWizardPage, QHBoxLayout, QVBoxLayout, QPushButton, QLineEdit,
+    QWizardPage, QHBoxLayout, QVBoxLayout, QFormLayout, QLineEdit,
     QListWidget, QMessageBox, QWidget, QGroupBox, QLabel, QSizePolicy,
 )
 from PyQt5.QtCore import Qt, QEvent, QPointF
 from PyQt5.QtGui import QColor, QFont
 from classes.zoomable_graphics_view import ZoomableGraphicsView
 from classes.apply_worker import ApplyWorker
+from classes.responsive_widgets import WrapButton, ButtonRow
 import os
 import re
 import shutil
@@ -13,13 +14,6 @@ from xml.etree import ElementTree as ET
 from utils.config import WORLDS_GAZEBO_DIR
 
 _VALID_WORLD_NAME = re.compile(r'^[A-Za-z0-9_]+$')
-
-
-def _btn(text, role=None):
-    b = QPushButton(text)
-    if role:
-        b.setProperty("btnRole", role)
-    return b
 
 
 class WallsDesignPage(QWizardPage):
@@ -38,20 +32,17 @@ class WallsDesignPage(QWizardPage):
 
         # World group
         world_group = QGroupBox("World")
-        wg_layout = QVBoxLayout(world_group)
+        wg_layout = QFormLayout(world_group)
         wg_layout.setSpacing(6)
-        wg_layout.addWidget(QLabel("Name"))
+        wg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.world_name_input = QLineEdit()
         self.world_name_input.setPlaceholderText("e.g. my_world")
-        wg_layout.addWidget(self.world_name_input)
-        btn_row = QHBoxLayout()
-        self.create_world_button = _btn("Create New")
+        wg_layout.addRow("Name", self.world_name_input)
+        self.create_world_button = WrapButton("Create New")
         self.create_world_button.clicked.connect(self.create_new_world)
-        self.load_world_button = _btn("Load")
+        self.load_world_button = WrapButton("Load")
         self.load_world_button.clicked.connect(self.load_world)
-        btn_row.addWidget(self.create_world_button)
-        btn_row.addWidget(self.load_world_button)
-        wg_layout.addLayout(btn_row)
+        wg_layout.addRow(ButtonRow(self.create_world_button, self.load_world_button))
         left_layout.addWidget(world_group)
 
         # Walls group
@@ -59,29 +50,27 @@ class WallsDesignPage(QWizardPage):
         wls_layout = QVBoxLayout(walls_group)
         wls_layout.setSpacing(6)
         self.wall_list = QListWidget()
-        self.wall_list.setFixedHeight(120)
+        self.wall_list.setFixedHeight(110)
         wls_layout.addWidget(self.wall_list)
-        self.remove_wall_button = _btn("Remove Selected", "danger")
+        self.remove_wall_button = WrapButton("Remove Selected", "danger")
         self.remove_wall_button.clicked.connect(self.remove_selected_wall)
         wls_layout.addWidget(self.remove_wall_button)
         left_layout.addWidget(walls_group)
 
         # Properties group
         props_group = QGroupBox("Wall Properties")
-        pg_layout = QVBoxLayout(props_group)
+        pg_layout = QFormLayout(props_group)
         pg_layout.setSpacing(6)
-        pg_layout.addWidget(QLabel("Width (m)"))
+        pg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.width_input = QLineEdit()
         self.width_input.setPlaceholderText("0.1")
-        pg_layout.addWidget(self.width_input)
-        pg_layout.addWidget(QLabel("Height (m)"))
+        pg_layout.addRow("Width (m)", self.width_input)
         self.height_input = QLineEdit()
         self.height_input.setPlaceholderText("1.0")
-        pg_layout.addWidget(self.height_input)
-        pg_layout.addWidget(QLabel("Color"))
+        pg_layout.addRow("Height (m)", self.height_input)
         self.color_input = QLineEdit()
         self.color_input.setPlaceholderText("Gray, Black, Red …")
-        pg_layout.addWidget(self.color_input)
+        pg_layout.addRow("Color", self.color_input)
         left_layout.addWidget(props_group)
 
         hint = QLabel("Click canvas: 1st point → 2nd point places a wall")
@@ -91,8 +80,9 @@ class WallsDesignPage(QWizardPage):
 
         left_layout.addStretch(1)
 
-        self.apply_button = _btn("Apply and Preview", "success")
+        self.apply_button = WrapButton("Apply and Preview", "success")
         self.apply_button.clicked.connect(self.apply_changes)
+        self.apply_button.setMinimumHeight(36)
         left_layout.addWidget(self.apply_button)
 
         # ── Canvas ─────────────────────────────────────────────────
