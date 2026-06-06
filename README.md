@@ -258,4 +258,4 @@ Please include documentation updates. For major changes, open a *GitHub Issue* f
 ---
 
 + Questions? Reach out: **a.pahlevani1998@gmail.com**
-+ Website: **https://www.SLAMbotics.org**
++ LinkedIn: **https://www.linkedin.com/in/ali-pahlevani/**
