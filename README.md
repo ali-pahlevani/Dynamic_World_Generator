@@ -2,14 +2,15 @@
 
 ![Dynamic World Generator Wizard Banner](https://github.com/user-attachments/assets/1b00aa22-24d7-40f1-8526-a3612bd7f503)
 
-**Dynamic World Generator Wizard** is a *PyQt5*-based graphical wizard application for building and managing dynamic simulation worlds. V2 adds a **Map Generation** step that exports a *ROS 2*-compatible occupancy grid map (`.pgm` + `.yaml`) directly from the designed world, along with a fully responsive UI that adapts to any window size.
+**Dynamic World Generator Wizard** is a *PyQt5*-based graphical wizard application for building and managing dynamic simulation worlds. V2 adds full **Gazebo Ionic** support, a **Map Generation** step that exports a *ROS 2*-compatible occupancy grid map (`.pgm` + `.yaml`) directly from the designed world, and a fully responsive UI that adapts to any window size.
 
-The wizard supports *Gazebo Harmonic* and *Fortress*. It guides users through a step-by-step process: select a simulator, design walls, place static and dynamic obstacles, generate an occupancy map, and apply everything to a live *Gazebo* session — all from one window.
+The wizard supports *Gazebo Ionic*, *Harmonic*, and *Fortress*. It guides users through a step-by-step process: select a simulator, design walls, place static and dynamic obstacles, generate an occupancy map, and apply everything to a live *Gazebo* session — all from one window.
 
 🙏 A special thanks to **Professor Sousso KELOUWANI** for his excellent idea that inspired the creation of this application.
 
 ## What's New in V2
 
+* **Gazebo Ionic Support**: Full support for *Gazebo Ionic* alongside *Harmonic* and *Fortress*, including the correct *SDF 1.12* world template, `gz-transport14` / `gz-msgs11` Python bindings for dynamic obstacles, and dedicated world and map output directories.
 * **Map Generation**: Export a *ROS 2*-ready occupancy grid (`.pgm` + `.yaml`) from the finished world, with configurable resolution, origin, thresholds, and mode.
 * **Fully Responsive UI**: Sidebar, cards, buttons, and input labels all adapt as the window resizes — no truncation or overlap at any size.
 * **Improved Navigation**: Centered, word-wrapped nav labels with a wider sidebar and larger font for readability.
@@ -17,13 +18,13 @@ The wizard supports *Gazebo Harmonic* and *Fortress*. It guides users through a 
 
 ## Key Features
 
-* **Simulation Selection**: Choose *Gazebo Harmonic* (recommended) or *Fortress*. *Isaac Sim* support is under development.
+* **Simulation Selection**: Choose *Gazebo Ionic*, *Harmonic* (recommended), or *Fortress*. *Isaac Sim* support is under development.
 * **Wall Design**: Draw walls on an interactive canvas with customizable width, height, and color.
 * **Static Obstacles**: Place boxes, cylinders, or spheres with per-type dimension controls.
 * **Dynamic Obstacles**: Assign linear, elliptical, or polygon motion paths with velocity and randomness (*std*).
 * **Map Generation**: Render an occupancy grid map from all static geometry, export as `.pgm` + `.yaml` ready for *ROS 2 Nav2*.
 * **Preview and Apply**: Real-time canvas preview; apply changes to *Gazebo* in one click.
-* **Coming Soon**: Teasers for *Gazebo Ionic* and *Isaac Sim 4.5.0 / 5.0.0*.
+* **Coming Soon**: *Isaac Sim 4.5.0*, *5.0.0*, and *5.1.0* support.
 
 ## Code Structure
 
@@ -51,30 +52,39 @@ Dynamic_World_Generator/
 │   │   └── color_utils.py             # Color-name to RGB mapping
 │   └── dwg_wizard.py                  # Entry point
 ├── images/
-│   ├── intro/
+│   ├── intro/                         # Images shown on the simulation selection page
 │   │   ├── welcome.gif
+│   │   ├── ionic.png
 │   │   ├── harmonic.png
-│   │   ├── fortress.jpeg
-│   │   └── isaacsim_450_gray.png
-│   └── future/
-│       ├── ionic.png
+│   │   └── fortress.jpeg
+│   └── future/                        # Images shown on the Coming Soon page
 │       ├── isaacsim_450.png
-│       └── isaacsim_500.png
+│       ├── isaacsim_500.png
+│       └── isaacsim_510.png
 ├── worlds/
-│   └── gazebo/
-│       ├── harmonic/
-│       │   ├── empty_world.sdf        # Template (tracked); generated worlds are git-ignored
-│       │   └── move_code/             # Generated launch scripts and motion scripts (git-ignored)
-│       └── fortress/
-│           ├── empty_world.sdf        # Template (tracked)
-│           └── move_code/
+│   ├── gazebo/
+│   │   ├── ionic/
+│   │   │   ├── empty_world.sdf        # Template (SDF 1.12, tracked); generated worlds are git-ignored
+│   │   │   └── move_code/             # Generated launch + motion scripts (git-ignored)
+│   │   ├── harmonic/
+│   │   │   ├── empty_world.sdf        # Template (SDF 1.9, tracked)
+│   │   │   └── move_code/
+│   │   └── fortress/
+│   │       ├── empty_world.sdf        # Template (SDF 1.8, tracked)
+│   │       └── move_code/
+│   └── isaacsim/
+│       ├── 450/
+│       ├── 500/
+│       └── 510/
 ├── maps/
 │   ├── gazebo/
-│   │   ├── harmonic/                  # Generated maps land here (git-ignored)
+│   │   ├── ionic/                     # Generated maps land here (git-ignored)
+│   │   ├── harmonic/
 │   │   └── fortress/
 │   └── isaacsim/
 │       ├── 450/
-│       └── 500/
+│       ├── 500/
+│       └── 510/
 └── README.md
 ```
 
@@ -89,13 +99,25 @@ Dynamic_World_Generator/
   ```bash
   pip install PyQt5 lxml
   ```
-* **Gazebo**: Install *Gazebo Harmonic* (recommended) or *Fortress*:
-  * *Harmonic* (*Ubuntu / Debian*): [https://gazebosim.org/docs/harmonic/install_ubuntu/](https://gazebosim.org/docs/harmonic/install_ubuntu/)
-  * *Fortress*: [https://gazebosim.org/docs/fortress/install_ubuntu/](https://gazebosim.org/docs/fortress/install_ubuntu/)
-  * For *Harmonic*, also install the Python transport bindings:
+* **Gazebo**: Install your preferred version:
+
+  | Version | Install guide |
+  |---|---|
+  | *Ionic* | [gazebosim.org/docs/ionic/install_ubuntu](https://gazebosim.org/docs/ionic/install_ubuntu/) |
+  | *Harmonic* | [gazebosim.org/docs/harmonic/install_ubuntu](https://gazebosim.org/docs/harmonic/install_ubuntu/) |
+  | *Fortress* | [gazebosim.org/docs/fortress/install_ubuntu](https://gazebosim.org/docs/fortress/install_ubuntu/) |
+
+* **Python transport bindings** (required for dynamic obstacle motion scripts):
+
+  * *Ionic* — installed via apt (no pip wheel available):
+    ```bash
+    sudo apt install python3-gz-transport14 python3-gz-msgs11
+    ```
+  * *Harmonic* — available via pip:
     ```bash
     pip install gz-transport13 gz-msgs10
     ```
+  * *Fortress* — no Python bindings needed; motion scripts use subprocess-based service calls instead.
 
 ### Setup
 
@@ -120,11 +142,12 @@ Dynamic_World_Generator/
 * **PyQt5 Errors**: Make sure a display server is running. On *WSL*, set `export DISPLAY=:0` or use an *X server* like *Xming*.
 * **Gazebo Not Found**:
   ```bash
-  gz sim --version    # Harmonic
+  gz sim --version      # Ionic or Harmonic
   ign gazebo --version  # Fortress
   ```
 * **Missing SDF Template**: `empty_world.sdf` must exist in `worlds/gazebo/{version}/`.
 * **Path Issues**: If images or worlds are not found, check `code/utils/config.py`. Update `PROJECT_ROOT` if the repo was moved.
+* **Transport Errors (Ionic)**: Ensure `python3-gz-transport14` and `python3-gz-msgs11` are installed via apt — pip wheels are not available for Ionic bindings.
 * **Transport Errors (Harmonic)**: Ensure `gz-transport13` and `gz-msgs10` are installed — they are required to animate dynamic obstacles.
 
 ## Tutorial: Building a Complete Dynamic World
@@ -139,11 +162,13 @@ An animated overview of the application. Click *Next* to begin.
 
 ### Step 2: Select Simulation Platform
 
-* **Gazebo Harmonic** *(Recommended)*: Latest Gazebo release with full dynamic obstacle support via Python bindings.
-* **Gazebo Fortress**: Suitable for static worlds; dynamic motion uses subprocess instead of Python bindings.
-* **Isaac Sim**: Under development — currently disabled.
+Three platforms are available, in this order:
 
-Click *Next* after selecting a platform.
+* **Gazebo Ionic**: Latest *Gazebo* release. Full dynamic obstacle support via `gz-transport14` / `gz-msgs11` Python bindings. Uses *SDF 1.12*.
+* **Gazebo Harmonic** *(Recommended)*: Stable, widely adopted release. Full dynamic obstacle support via `gz-transport13` / `gz-msgs10`. Uses *SDF 1.9*.
+* **Gazebo Fortress**: Suitable primarily for static worlds. Dynamic motion falls back to subprocess-based service calls instead of Python bindings. Uses *SDF 1.8*.
+
+Click the *Select* button on your chosen card, then click *Next*.
 
 <img width="1857" height="1048" alt="Simulation Selection" src="https://github.com/user-attachments/assets/7d7aa432-506c-49c9-9ad2-50e3b1d29ad7" />
 
@@ -181,7 +206,7 @@ Click *Next* after selecting a platform.
 
 <img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/b287e0b4-e7d1-41d3-8f04-daedb002bf95" />
 
-### Step 6: Generate Occupancy Map *(New in V2)*
+### Step 6: Generate Occupancy Map
 
 This step renders all static geometry (walls, boxes, cylinders, spheres) into a *ROS 2*-compatible occupancy grid map.
 
@@ -199,9 +224,10 @@ This step renders all static geometry (walls, boxes, cylinders, spheres) into a 
 ### Step 7: Coming Soon
 
 Teasers for planned simulator support:
-* **Gazebo Ionic**
-* **Isaac Sim 4.5.0**
-* **Isaac Sim 5.0.0**
+
+* **Isaac Sim 4.5.0** *(In Progress)*
+* **Isaac Sim 5.0.0** *(Planned)*
+* **Isaac Sim 5.1.0** *(Planned)*
 
 Click *Finish* to close the wizard.
 
@@ -211,7 +237,7 @@ Click *Finish* to close the wizard.
 
 **Dynamic World Generator Wizard** is a foundation for an open-source simulation world builder. Planned enhancements include:
 
-* **Isaac Sim Support**: Full integration with *Isaac Sim 4.5.0* and *5.0.0*.
+* **Isaac Sim Support**: Full integration with *Isaac Sim 4.5.0*, *5.0.0*, and *5.1.0*.
 * **Additional Motion Types**: Sinusoidal, random walk, or spline-based paths.
 * **Export Options**: Direct *ROS 2* package export, *Unity*, or other simulator formats.
 * **UI Enhancements**: Undo/redo, 3D preview, drag-and-drop obstacle placement.
