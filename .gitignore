@@ -1,8 +1,18 @@
 # ignore standalone code (old version)
 standalone_code/
 
-# ignore __pycache_
-code/__pycache__/
-code/utils/__pycache__/
-code/classes/__pycache__/
-code/classes/pages/__pycache__/
+# Python cache
+**/__pycache__/
+*.pyc
+
+# Generated world SDF files (keep only empty_world.sdf templates)
+worlds/**/*.sdf
+!worlds/**/empty_world.sdf
+
+# Generated launch scripts and dynamic-obstacle scripts
+worlds/**/move_code/*.sh
+worlds/**/move_code/*.py
+
+# Generated map outputs
+maps/**/*.pgm
+maps/**/*.yaml
