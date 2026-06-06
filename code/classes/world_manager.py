@@ -1,4 +1,5 @@
 import os
+import re
 import signal
 import subprocess
 import time
@@ -6,6 +7,8 @@ import math
 from xml.etree import ElementTree as ET
 from utils.color_utils import get_color
 from utils.config import PROJECT_ROOT, WORLDS_GAZEBO_DIR
+
+_VALID_WORLD_NAME = re.compile(r'^[A-Za-z0-9_]+$')
 
 
 class WorldManager:
@@ -164,63 +167,121 @@ class WorldManager:
         self.models.append(model)
 
     def apply_changes(self):
-        if not self.process or self.process.poll() is not None:
-            raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
+        """Push pending model changes to the running Gazebo simulation.
 
-        time.sleep(2)
+        Returns a list of (model_name, error_message) tuples for every model
+        that failed to be applied.  An empty list means full success.
+        """
+        if not self.process or self.process.poll() is not None:
+            raise RuntimeError(
+                "Gazebo simulation is not running. "
+                "Please create or load a world first."
+            )
+
+        if not _VALID_WORLD_NAME.match(self.world_name or ""):
+            raise RuntimeError(
+                f"World name '{self.world_name}' is not a valid Gazebo service name.\n"
+                "World names may only contain letters, numbers, and underscores — "
+                "no spaces or special characters.\n"
+                f"Rename the world to: {re.sub(r'[^A-Za-z0-9_]', '_', self.world_name or 'my_world')}"
+            )
 
         prefix = "ign" if self.version == "fortress" else "gz"
+        print(f"[DWG] apply_changes — world='{self.world_name}' version={self.version}")
+        self._wait_for_gazebo_ready(prefix)
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
+        SERVICE_TIMEOUT = "5000"
+
+        # Stop any running motion script BEFORE touching entities.
+        # If the old script keeps sending set_pose calls during remove/create,
+        # Gazebo logs floods of "Unable to update pose for entity id:[0]".
+        if self.script_process and self.script_process.poll() is None:
+            self.script_process.terminate()
+            try:
+                self.script_process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.script_process.kill()
+                self.script_process.wait(timeout=2)
+            self.script_process = None
+
+        errors = []          # (name, message)
+        applied_names = set()  # models successfully pushed to Gazebo
 
         for model in self.models[:]:
+            name = model["name"]
+
+            # ── updated: delete existing, then re-create ─────────────────
             if model["status"] == "updated":
-                request_str = f'name: "{model["name"]}", type: 2'
-                cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
-                    "--reqtype", f"{reqtype_prefix}.Entity",
-                    "--reptype", f"{reqtype_prefix}.Boolean",
-                    "--timeout", "3000",
-                    "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode == 0:
-                    for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
+                req = f'name: "{name}", type: 2'
+                cmd = [prefix, "service", "-s",
+                       f"/world/{self.world_name}/remove",
+                       "--reqtype", f"{reqtype_prefix}.Entity",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", SERVICE_TIMEOUT,
+                       "--req", req]
+                print(f"[DWG]   remove '{name}' …")
+                r = subprocess.run(cmd, capture_output=True, text=True)
+                print(f"[DWG]     rc={r.returncode}  stdout={r.stdout.strip()!r}"
+                      f"  stderr={r.stderr.strip()!r}")
+                if r.returncode == 0:
+                    for elem in self.sdf_root.findall(
+                            f".//model[@name='{name}']"):
                         self.sdf_root.find("world").remove(elem)
                     self.save_sdf(self.world_path)
-                # Always fall through to creation regardless of deletion result
-                model["status"] = "new"
+                model["status"] = "new"   # fall through to creation
 
+            # ── new: create ───────────────────────────────────────────────
             if model["status"] == "new":
-                sdf_snippet_service = self.generate_model_sdf(model, for_service=True)
-                sdf_escaped = sdf_snippet_service.replace('"', '\\"')
-                sdf_compact = ' '.join(sdf_escaped.split())
-                request_str = f'sdf: "{sdf_compact}"'
-                cmd = [prefix, "service", "-s", f"/world/{self.world_name}/create",
-                    "--reqtype", f"{reqtype_prefix}.EntityFactory",
-                    "--reptype", f"{reqtype_prefix}.Boolean",
-                    "--timeout", "3000",
-                    "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0 or "data: true" not in result.stdout:
+                sdf_service = self.generate_model_sdf(model, for_service=True)
+                sdf_escaped = sdf_service.replace('"', '\\"')
+                sdf_compact = " ".join(sdf_escaped.split())
+                req = f'sdf: "{sdf_compact}"'
+                cmd = [prefix, "service", "-s",
+                       f"/world/{self.world_name}/create",
+                       "--reqtype", f"{reqtype_prefix}.EntityFactory",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", SERVICE_TIMEOUT,
+                       "--req", req]
+                print(f"[DWG]   create '{name}' ({model['type']}) …")
+                r = subprocess.run(cmd, capture_output=True, text=True)
+                print(f"[DWG]     rc={r.returncode}  stdout={r.stdout.strip()!r}"
+                      f"  stderr={r.stderr.strip()!r}")
+                if r.returncode != 0 or "data: true" not in r.stdout:
+                    detail = (r.stderr.strip() or r.stdout.strip()
+                              or "no response from Gazebo service")
+                    errors.append((name, detail))
+                    # Keep status="new" so the user can retry
                     continue
-                time.sleep(1)
-                sdf_snippet_file = self.generate_model_sdf(model, for_service=False)
-                model_elem = ET.fromstring(sdf_snippet_file)
-                for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
+                time.sleep(0.5)
+                sdf_file = self.generate_model_sdf(model, for_service=False)
+                model_elem = ET.fromstring(sdf_file)
+                for elem in self.sdf_root.findall(f".//model[@name='{name}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.sdf_root.find("world").append(model_elem)
                 self.save_sdf(self.world_path)
+                applied_names.add(name)
+
+            # ── removed: delete ───────────────────────────────────────────
             elif model["status"] == "removed":
-                request_str = f'name: "{model["name"]}", type: 2'
-                cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
-                    "--reqtype", f"{reqtype_prefix}.Entity",
-                    "--reptype", f"{reqtype_prefix}.Boolean",
-                    "--timeout", "3000",
-                    "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
+                req = f'name: "{name}", type: 2'
+                cmd = [prefix, "service", "-s",
+                       f"/world/{self.world_name}/remove",
+                       "--reqtype", f"{reqtype_prefix}.Entity",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", SERVICE_TIMEOUT,
+                       "--req", req]
+                print(f"[DWG]   delete '{name}' …")
+                r = subprocess.run(cmd, capture_output=True, text=True)
+                print(f"[DWG]     rc={r.returncode}  stdout={r.stdout.strip()!r}"
+                      f"  stderr={r.stderr.strip()!r}")
+                if r.returncode != 0:
+                    detail = r.stderr.strip() or r.stdout.strip() or "remove failed"
+                    errors.append((name, detail))
                     continue
-                for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
+                for elem in self.sdf_root.findall(f".//model[@name='{name}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
+                applied_names.add(name)
 
         dynamic_models = [m for m in self.models if "motion" in m["properties"]]
         if dynamic_models:
@@ -229,6 +290,10 @@ class WorldManager:
             script_path = os.path.join(move_code_dir, f"{self.world_name}_moveObstacles.py")
             with open(script_path, 'w') as f:
                 f.write('#!/usr/bin/env python3\n')
+                # Must be set before any gz/protobuf import to work around
+                # protobuf >= 4.x C-extension incompatibility with older stubs.
+                f.write('import os\n')
+                f.write('os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"\n')
                 f.write('import time\n')
                 f.write('import random\n')
                 f.write('import math\n\n')
@@ -354,17 +419,43 @@ class WorldManager:
                 f.write('wait\n')
             os.chmod(launch_path, 0o755)
 
-            if self.script_process and self.script_process.poll() is None:
-                self.script_process.terminate()
-                try:
-                    self.script_process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    self.script_process.kill()
-            self.script_process = subprocess.Popen(['python3', script_path])
+            env = os.environ.copy()
+            env['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+            self.script_process = subprocess.Popen(['python3', script_path], env=env)
 
-        self.models = [m for m in self.models if m["status"] != "removed"]
+        # Only purge models that were successfully removed from Gazebo
+        self.models = [m for m in self.models
+                       if not (m["status"] == "removed" and m["name"] in applied_names)]
+        # Only clear status for models that were actually pushed to Gazebo;
+        # failed models keep their current status so they can be retried.
         for model in self.models:
-            model["status"] = ""
+            if model["name"] in applied_names:
+                model["status"] = ""
+
+        n_ok = len(applied_names)
+        n_err = len(errors)
+        print(f"[DWG] apply_changes done — {n_ok} applied, {n_err} failed")
+        return errors
+
+    def _wait_for_gazebo_ready(self, prefix, timeout=20):
+        """Poll until Gazebo registers the world service, with a printed countdown."""
+        service_path = f"/world/{self.world_name}/create"
+        print(f"[DWG] Waiting for Gazebo service '{service_path}' (max {timeout}s) …")
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                r = subprocess.run(
+                    [prefix, "service", "--list"],
+                    capture_output=True, text=True, timeout=2,
+                )
+                if service_path in r.stdout:
+                    elapsed = timeout - (deadline - time.time())
+                    print(f"[DWG] Gazebo ready after {elapsed:.1f}s")
+                    return
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+            time.sleep(0.5)
+        print(f"[DWG] WARNING: service not found after {timeout}s — proceeding anyway")
 
     def cleanup(self):
         if self.sdf_tree and self.world_path:

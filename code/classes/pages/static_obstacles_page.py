@@ -1,7 +1,18 @@
-from PyQt5.QtWidgets import QWizardPage, QHBoxLayout, QVBoxLayout, QComboBox, QListWidget, QPushButton, QLineEdit, QMessageBox, QWidget
+from PyQt5.QtWidgets import (
+    QWizardPage, QHBoxLayout, QVBoxLayout, QComboBox, QListWidget,
+    QPushButton, QLineEdit, QMessageBox, QWidget, QGroupBox, QLabel,
+    QSizePolicy,
+)
 from PyQt5.QtCore import Qt, QEvent, QPointF
 from PyQt5.QtGui import QColor
 from classes.zoomable_graphics_view import ZoomableGraphicsView
+
+
+def _btn(text, role=None):
+    b = QPushButton(text)
+    if role:
+        b.setProperty("btnRole", role)
+    return b
 
 
 class StaticObstaclesPage(QWizardPage):
@@ -11,100 +22,134 @@ class StaticObstaclesPage(QWizardPage):
         self.world_manager = None
         self.scene = scene
 
-        layout = QHBoxLayout()
-        left_widget = QWidget()
-        left_layout = QVBoxLayout()
+        # ── Left panel ─────────────────────────────────────────────
+        self.left_widget = QWidget()
+        self.left_widget.setFixedWidth(260)
+        left_layout = QVBoxLayout(self.left_widget)
+        left_layout.setContentsMargins(8, 8, 8, 8)
+        left_layout.setSpacing(10)
 
+        # Type group
+        type_group = QGroupBox("Obstacle Type")
+        tg_layout = QVBoxLayout(type_group)
+        tg_layout.setSpacing(6)
         self.obstacle_type_combo = QComboBox()
         self.obstacle_type_combo.addItems(["Box", "Cylinder", "Sphere"])
         self.obstacle_type_combo.currentTextChanged.connect(self.update_input_fields)
-        left_layout.addWidget(self.obstacle_type_combo)
+        tg_layout.addWidget(self.obstacle_type_combo)
+        left_layout.addWidget(type_group)
 
+        # Obstacle list group
+        list_group = QGroupBox("Placed Obstacles")
+        lg_layout = QVBoxLayout(list_group)
+        lg_layout.setSpacing(6)
         self.obstacle_list = QListWidget()
-        left_layout.addWidget(self.obstacle_list)
-
-        self.remove_obstacle_button = QPushButton("Remove Selected Obstacle")
+        self.obstacle_list.setFixedHeight(120)
+        lg_layout.addWidget(self.obstacle_list)
+        self.remove_obstacle_button = _btn("Remove Selected", "danger")
         self.remove_obstacle_button.clicked.connect(self.remove_selected_obstacle)
-        left_layout.addWidget(self.remove_obstacle_button)
+        lg_layout.addWidget(self.remove_obstacle_button)
+        left_layout.addWidget(list_group)
 
+        # Dimensions group
+        dims_group = QGroupBox("Dimensions")
+        dg_layout = QVBoxLayout(dims_group)
+        dg_layout.setSpacing(6)
+
+        self._lbl_w = QLabel("Width (m)")
+        dg_layout.addWidget(self._lbl_w)
         self.width_input = QLineEdit()
-        self.width_input.setPlaceholderText("Width (m) for Box")
-        left_layout.addWidget(self.width_input)
+        self.width_input.setPlaceholderText("0.5")
+        dg_layout.addWidget(self.width_input)
 
+        self._lbl_l = QLabel("Length (m)")
+        dg_layout.addWidget(self._lbl_l)
         self.length_input = QLineEdit()
-        self.length_input.setPlaceholderText("Length (m) for Box")
-        left_layout.addWidget(self.length_input)
+        self.length_input.setPlaceholderText("0.5")
+        dg_layout.addWidget(self.length_input)
 
+        self._lbl_h = QLabel("Height (m)")
+        dg_layout.addWidget(self._lbl_h)
         self.height_input = QLineEdit()
-        self.height_input.setPlaceholderText("Height (m)")
-        left_layout.addWidget(self.height_input)
+        self.height_input.setPlaceholderText("1.0")
+        dg_layout.addWidget(self.height_input)
 
+        self._lbl_r = QLabel("Radius (m)")
+        dg_layout.addWidget(self._lbl_r)
         self.radius_input = QLineEdit()
-        self.radius_input.setPlaceholderText("Radius (m) for Cylinder/Sphere")
-        left_layout.addWidget(self.radius_input)
+        self.radius_input.setPlaceholderText("0.5")
+        dg_layout.addWidget(self.radius_input)
 
+        dg_layout.addWidget(QLabel("Color"))
         self.color_input = QLineEdit()
-        self.color_input.setPlaceholderText("Color (e.g., Red)")
-        left_layout.addWidget(self.color_input)
+        self.color_input.setPlaceholderText("Gray, Red, Blue …")
+        dg_layout.addWidget(self.color_input)
+        left_layout.addWidget(dims_group)
 
-        self.apply_button = QPushButton("Apply and Preview")
+        hint = QLabel("Click on the canvas to place the obstacle")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #7F8C8D; font-size: 9pt;")
+        left_layout.addWidget(hint)
+
+        left_layout.addStretch(1)
+
+        self.apply_button = _btn("Apply and Preview", "success")
         self.apply_button.clicked.connect(self.apply_changes)
         left_layout.addWidget(self.apply_button)
-        left_widget.setLayout(left_layout)
 
+        # ── Canvas ─────────────────────────────────────────────────
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
+        self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        window_width = 1500
-        canvas_width = int(window_width * 0.7)
-        self.view.setMinimumWidth(int(800 * 0.7))
-        self.view.setMaximumWidth(canvas_width)
-        left_widget.setMinimumWidth(150)
-        left_widget.setMaximumWidth(window_width - canvas_width - 260)
-
-        layout.addWidget(left_widget)
-        layout.addWidget(self.view)
-        self.setLayout(layout)
+        # ── Main layout ────────────────────────────────────────────
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.left_widget)
+        layout.addWidget(self.view, 1)
 
         self.update_input_fields()
+
+    # ── Lifecycle ──────────────────────────────────────────────────────────
 
     def initializePage(self):
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
-            QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            QMessageBox.warning(self, "Error",
+                                "Select a simulation and create/load a world first.")
             return
-        self.refresh_obstacles()
+        self._refresh_list()
 
-    def refresh_obstacles(self):
+    def _refresh_list(self):
         self.obstacle_list.clear()
         self.wizard().refresh_canvas(self.scene)
-        for model in self.world_manager.models:
-            if model["type"] in ["box", "cylinder", "sphere"]:
-                self.obstacle_list.addItem(model["name"])
+        for m in self.world_manager.models:
+            if m["type"] in ("box", "cylinder", "sphere"):
+                self.obstacle_list.addItem(m["name"])
+
+    # ── Input visibility ───────────────────────────────────────────────────
 
     def update_input_fields(self):
-        obstacle_type = self.obstacle_type_combo.currentText()
-        if obstacle_type == "Box":
-            self.width_input.setEnabled(True)
-            self.length_input.setEnabled(True)
-            self.height_input.setEnabled(True)
-            self.radius_input.setEnabled(False)
-        elif obstacle_type == "Cylinder":
-            self.width_input.setEnabled(False)
-            self.length_input.setEnabled(False)
-            self.height_input.setEnabled(True)
-            self.radius_input.setEnabled(True)
-        elif obstacle_type == "Sphere":
-            self.width_input.setEnabled(False)
-            self.length_input.setEnabled(False)
-            self.height_input.setEnabled(False)
-            self.radius_input.setEnabled(True)
+        otype = self.obstacle_type_combo.currentText()
+        box = (otype == "Box")
+        cyl = (otype == "Cylinder")
+        sph = (otype == "Sphere")
+        for w in (self._lbl_w, self.width_input, self._lbl_l, self.length_input):
+            w.setVisible(box)
+        for w in (self._lbl_h, self.height_input):
+            w.setVisible(box or cyl)
+        for w in (self._lbl_r, self.radius_input):
+            w.setVisible(cyl or sph)
+
+    # ── Grid snapping ──────────────────────────────────────────────────────
 
     def snap_to_grid(self, point, grid_spacing=10):
-        x = round(point.x() / grid_spacing) * grid_spacing
-        y = round(point.y() / grid_spacing) * grid_spacing
-        return QPointF(x, y)
+        return QPointF(
+            round(point.x() / grid_spacing) * grid_spacing,
+            round(point.y() / grid_spacing) * grid_spacing,
+        )
 
     def _next_obstacle_name(self, obstacle_type):
         existing = {m["name"] for m in self.world_manager.models}
@@ -113,81 +158,92 @@ class StaticObstaclesPage(QWizardPage):
             idx += 1
         return f"{obstacle_type}_{idx}"
 
+    # ── Mouse interaction ──────────────────────────────────────────────────
+
     def eventFilter(self, obj, event):
-        if obj == self.view and event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self.world_manager:
-            clicked_point = self.view.mapToScene(event.pos())
-            center = self.snap_to_grid(clicked_point)
-            obstacle_type = self.obstacle_type_combo.currentText().lower()
+        if (obj == self.view and self.world_manager and
+                event.type() == QEvent.MouseButtonPress and
+                event.button() == Qt.LeftButton):
+            center = self.snap_to_grid(self.view.mapToScene(event.pos()))
+            otype = self.obstacle_type_combo.currentText().lower()
             try:
-                if obstacle_type == "box":
-                    W = float(self.width_input.text() or 0.1)
-                    L = float(self.length_input.text() or 0.1)
+                if otype == "box":
+                    W = float(self.width_input.text() or 0.5)
+                    L = float(self.length_input.text() or 0.5)
                     H = float(self.height_input.text() or 1.0)
-                    size_m = (W, L, H)
-                    position_z = H / 2
-                elif obstacle_type == "cylinder":
+                    size_m, position_z = (W, L, H), H / 2
+                elif otype == "cylinder":
                     R = float(self.radius_input.text() or 0.5)
                     H = float(self.height_input.text() or 1.0)
-                    size_m = (R, H)
-                    position_z = H / 2
-                elif obstacle_type == "sphere":
+                    size_m, position_z = (R, H), H / 2
+                else:  # sphere
                     R = float(self.radius_input.text() or 0.5)
-                    size_m = (R,)
-                    position_z = R
-                color = self.color_input.text() or "Gray"
-                obstacle_name = self._next_obstacle_name(obstacle_type)
-                x_m = center.x() / 100
-                y_m = -center.y() / 100
+                    size_m, position_z = (R,), R
+                color = self.color_input.text().strip() or "Gray"
+                name = self._next_obstacle_name(otype)
                 obstacle = {
-                    "name": obstacle_name,
-                    "type": obstacle_type,
+                    "name": name,
+                    "type": otype,
                     "properties": {
-                        "position": (x_m, y_m, position_z),
+                        "position": (center.x() / 100, -center.y() / 100, position_z),
                         "size": size_m,
-                        "color": color
+                        "color": color,
                     },
-                    "status": "new"
+                    "status": "new",
                 }
                 self.world_manager.add_model(obstacle)
-                self.obstacle_list.addItem(obstacle_name)
+                self.obstacle_list.addItem(name)
                 self.wizard().refresh_canvas(self.scene)
             except ValueError:
-                QMessageBox.warning(self, "Invalid Input", "Please enter valid numeric values for dimensions.")
+                QMessageBox.warning(self, "Invalid Input",
+                                    "Enter valid numeric values for dimensions.")
             return True
         return super().eventFilter(obj, event)
 
+    # ── Obstacle actions ───────────────────────────────────────────────────
+
     def remove_selected_obstacle(self):
         if not self.world_manager:
-            QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            QMessageBox.warning(self, "Error",
+                                "Select a simulation and create/load a world first.")
             return
         selected = self.obstacle_list.currentItem()
-        if selected:
-            obstacle_name = selected.text()
-            if obstacle_name in self.wizard().obstacle_items:
-                item, text = self.wizard().obstacle_items[obstacle_name]
-                self.scene.removeItem(item)
-                self.scene.removeItem(text)
-                del self.wizard().obstacle_items[obstacle_name]
-            if obstacle_name in self.wizard().path_items:
-                for path_item in self.wizard().path_items[obstacle_name]:
-                    self.scene.removeItem(path_item)
-                del self.wizard().path_items[obstacle_name]
-            for model in self.world_manager.models:
-                if model["name"] == obstacle_name:
-                    model["status"] = "removed"
-                    break
-            self.obstacle_list.takeItem(self.obstacle_list.row(selected))
+        if not selected:
+            return
+        name = selected.text()
+        if name in self.wizard().obstacle_items:
+            item, text = self.wizard().obstacle_items.pop(name)
+            self.scene.removeItem(item)
+            self.scene.removeItem(text)
+        if name in self.wizard().path_items:
+            for pi in self.wizard().path_items.pop(name):
+                self.scene.removeItem(pi)
+        for m in self.world_manager.models:
+            if m["name"] == name:
+                m["status"] = "removed"
+                break
+        self.obstacle_list.takeItem(self.obstacle_list.row(selected))
 
     def apply_changes(self):
         if not self.world_manager:
-            QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            QMessageBox.warning(self, "Error",
+                                "Select a simulation and create/load a world first.")
             return
         try:
-            self.world_manager.apply_changes()
+            errors = self.world_manager.apply_changes()
             self.wizard().refresh_canvas(self.scene)
-            QMessageBox.information(self, "Success", "Changes applied successfully.")
+            if errors:
+                detail = "\n".join(f"• {n}: {msg}" for n, msg in errors)
+                QMessageBox.warning(
+                    self, "Partial Failure",
+                    f"{len(errors)} model(s) were not applied to Gazebo:\n\n{detail}\n\n"
+                    "Check the terminal for the raw Gazebo service output.\n"
+                    "You can click 'Apply and Preview' again to retry.",
+                )
+            else:
+                QMessageBox.information(self, "Success", "All changes applied to Gazebo.")
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to apply changes:\n{e}")
 
     def isComplete(self):
         return self.world_manager is not None and self.world_manager.world_name is not None

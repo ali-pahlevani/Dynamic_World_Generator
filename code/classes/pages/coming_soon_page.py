@@ -1,8 +1,60 @@
-from PyQt5.QtWidgets import QWizardPage, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QMessageBox
+from PyQt5.QtWidgets import (
+    QWizardPage, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QMessageBox,
+    QSizePolicy,
+)
 from PyQt5.QtGui import QFont, QPixmap
 from PyQt5.QtCore import Qt
 from utils.config import FUTURE_IMAGES_DIR
 import os
+
+
+def _feature_card(image_path, scale_w, scale_h, title_text, badge=None):
+    card = QWidget()
+    card.setStyleSheet("""
+        QWidget {
+            background-color: #FFFFFF;
+            border: 1.5px solid #D5D8DC;
+            border-radius: 10px;
+        }
+    """)
+    card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+    vbox = QVBoxLayout(card)
+    vbox.setContentsMargins(20, 20, 20, 16)
+    vbox.setSpacing(10)
+
+    img_label = QLabel()
+    img_label.setAlignment(Qt.AlignCenter)
+    if os.path.exists(image_path):
+        pixmap = QPixmap(image_path).scaled(scale_w, scale_h,
+                                            Qt.KeepAspectRatio,
+                                            Qt.SmoothTransformation)
+        img_label.setPixmap(pixmap)
+    else:
+        img_label.setText("Image not found")
+        img_label.setStyleSheet("color: #95A5A6; border: none;")
+    img_label.setFixedHeight(280)
+    vbox.addWidget(img_label)
+
+    title = QLabel(title_text)
+    title.setAlignment(Qt.AlignCenter)
+    title.setStyleSheet(
+        "font-size: 13pt; font-weight: bold; color: #2C3E50; "
+        "border: none; background-color: transparent;"
+    )
+    vbox.addWidget(title)
+
+    if badge:
+        b = QLabel(badge)
+        b.setAlignment(Qt.AlignCenter)
+        b.setStyleSheet(
+            "font-size: 9pt; color: #FFFFFF; background-color: #E67E22; "
+            "border-radius: 4px; padding: 3px 10px; border: none;"
+        )
+        vbox.addWidget(b)
+
+    vbox.addStretch(1)
+    return card
 
 
 class ComingSoonPage(QWizardPage):
@@ -11,60 +63,41 @@ class ComingSoonPage(QWizardPage):
         self.setTitle("Coming Soon")
         self.world_manager = None
 
-        layout = QVBoxLayout()
-        layout.addStretch(1)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 20, 30, 20)
+        layout.setSpacing(20)
 
-        images_widget = QWidget()
-        images_layout = QHBoxLayout()
-        images_layout.setSpacing(20)
+        header = QLabel("What's next for DWG Wizard")
+        header.setAlignment(Qt.AlignCenter)
+        header.setStyleSheet("font-size: 16pt; font-weight: bold; color: #2C3E50;")
+        layout.addWidget(header)
 
-        def make_feature(label_text, image_path, scale_w, scale_h):
-            widget = QWidget()
-            vbox = QVBoxLayout()
-            label = QLabel(label_text)
-            label.setAlignment(Qt.AlignCenter)
-            label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
-            label.setStyleSheet("color: red;")
-            img_label = QLabel()
-            if os.path.exists(image_path):
-                pixmap = QPixmap(image_path).scaled(scale_w, scale_h, Qt.KeepAspectRatio)
-                img_label.setPixmap(pixmap)
-            else:
-                img_label.setText(f"Image not found: {os.path.basename(image_path)}")
-            img_label.setFixedSize(350, 350)
-            img_label.setAlignment(Qt.AlignCenter)
-            vbox.addWidget(img_label, alignment=Qt.AlignCenter)
-            vbox.addSpacing(10)
-            vbox.addWidget(label)
-            vbox.addStretch(1)
-            widget.setLayout(vbox)
-            return widget
+        sub = QLabel("These simulation platforms and features are currently under development.")
+        sub.setAlignment(Qt.AlignCenter)
+        sub.setStyleSheet("font-size: 11pt; color: #7F8C8D;")
+        layout.addWidget(sub)
 
-        images_layout.addWidget(make_feature(
-            "Gazebo Ionic",
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(20)
+        cards_row.addWidget(_feature_card(
             os.path.join(FUTURE_IMAGES_DIR, "ionic.png"),
-            350, 350
+            300, 260, "Gazebo Ionic", badge="Planned"
         ))
-        images_layout.addWidget(make_feature(
-            "Isaac Sim 4.5.0",
+        cards_row.addWidget(_feature_card(
             os.path.join(FUTURE_IMAGES_DIR, "isaacsim_450.png"),
-            674, 1264
+            300, 260, "Isaac Sim 4.5.0", badge="In Progress"
         ))
-        images_layout.addWidget(make_feature(
-            "Isaac Sim 5.0.0",
+        cards_row.addWidget(_feature_card(
             os.path.join(FUTURE_IMAGES_DIR, "isaacsim_500.png"),
-            674, 1264
+            300, 260, "Isaac Sim 5.0.0", badge="Planned"
         ))
-
-        images_widget.setLayout(images_layout)
-        layout.addWidget(images_widget, alignment=Qt.AlignCenter)
-        layout.addStretch(1)
-        self.setLayout(layout)
+        layout.addLayout(cards_row, 1)
 
     def initializePage(self):
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
-            QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            QMessageBox.warning(self, "Notice",
+                                "No world loaded — this page is for preview only.")
 
     def isComplete(self):
         return self.world_manager is not None and self.world_manager.world_name is not None
