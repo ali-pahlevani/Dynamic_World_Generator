@@ -11,6 +11,7 @@ from classes.pages.sim_selection_page import SimSelectionPage
 from classes.pages.walls_design_page import WallsDesignPage
 from classes.pages.static_obstacles_page import StaticObstaclesPage
 from classes.pages.dynamic_obstacles_page import DynamicObstaclesPage
+from classes.pages.map_generation_page import MapGenerationPage
 from classes.pages.coming_soon_page import ComingSoonPage
 from utils.color_utils import get_color
 import math
@@ -21,12 +22,14 @@ _NAV_LABELS = [
     "  Design Walls",
     "  Static Obstacles",
     "  Dynamic Obstacles",
+    "  Map Generation",
     "  Coming Soon",
 ]
 
 _PAGE_NAMES = [
     "Welcome", "Select Simulation", "Design Walls",
-    "Add Static Obstacles", "Add Dynamic Obstacles", "Coming Soon",
+    "Add Static Obstacles", "Add Dynamic Obstacles",
+    "Generate Map", "Coming Soon",
 ]
 
 _SIDEBAR_QSS = """
@@ -105,7 +108,7 @@ class DynamicWorldWizard(QWizard):
         self.nav_list.itemClicked.connect(self.navigate_to_page)
         sidebar_layout.addWidget(self.nav_list, 1)
 
-        version_label = QLabel("v1.0")
+        version_label = QLabel("v2.0")
         version_label.setAlignment(Qt.AlignCenter)
         version_label.setStyleSheet("""
             QLabel {
@@ -129,6 +132,8 @@ class DynamicWorldWizard(QWizard):
         self.addPage(self.static_obstacles_page)
         self.dynamic_obstacles_page = DynamicObstaclesPage(self.scene)
         self.addPage(self.dynamic_obstacles_page)
+        self.map_generation_page = MapGenerationPage()
+        self.addPage(self.map_generation_page)
         self.addPage(ComingSoonPage())
 
         sim_selection_page.simulationSelected.connect(self.initialize_world_manager)
@@ -181,6 +186,10 @@ class DynamicWorldWizard(QWizard):
             page.view.setFixedWidth(canvas_w)
             if hasattr(page, "left_widget"):
                 page.left_widget.setFixedWidth(left_w)
+
+        # Map page has a preview panel instead of a QGraphicsView
+        if hasattr(self, "map_generation_page"):
+            self.map_generation_page.left_widget.setFixedWidth(left_w)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

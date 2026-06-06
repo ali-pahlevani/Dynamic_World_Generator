@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QEvent, QPointF
 from PyQt5.QtGui import QColor
 from classes.zoomable_graphics_view import ZoomableGraphicsView
+from classes.apply_worker import ApplyWorker
 
 
 def _btn(text, role=None):
@@ -229,21 +230,36 @@ class StaticObstaclesPage(QWizardPage):
             QMessageBox.warning(self, "Error",
                                 "Select a simulation and create/load a world first.")
             return
-        try:
-            errors = self.world_manager.apply_changes()
-            self.wizard().refresh_canvas(self.scene)
-            if errors:
-                detail = "\n".join(f"• {n}: {msg}" for n, msg in errors)
-                QMessageBox.warning(
-                    self, "Partial Failure",
-                    f"{len(errors)} model(s) were not applied to Gazebo:\n\n{detail}\n\n"
-                    "Check the terminal for the raw Gazebo service output.\n"
-                    "You can click 'Apply and Preview' again to retry.",
-                )
-            else:
-                QMessageBox.information(self, "Success", "All changes applied to Gazebo.")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to apply changes:\n{e}")
+        self.apply_button.setEnabled(False)
+        self.apply_button.setText("Applying…")
+        self._worker = ApplyWorker(self.world_manager)
+        self._worker.finished.connect(self._on_applied)
+        self._worker.errored.connect(self._on_apply_error)
+        self._worker.start()
+
+    def _on_applied(self, errors):
+        self.apply_button.setEnabled(True)
+        self.apply_button.setText("Apply and Preview")
+        self.wizard().refresh_canvas(self.scene)
+        self._worker.deleteLater()
+        self._worker = None
+        if errors:
+            detail = "\n".join(f"• {n}: {msg}" for n, msg in errors)
+            QMessageBox.warning(
+                self, "Partial Failure",
+                f"{len(errors)} model(s) were not applied to Gazebo:\n\n{detail}\n\n"
+                "Check the terminal for the raw Gazebo service output.\n"
+                "You can click 'Apply and Preview' again to retry.",
+            )
+        else:
+            QMessageBox.information(self, "Success", "All changes applied to Gazebo.")
+
+    def _on_apply_error(self, msg):
+        self.apply_button.setEnabled(True)
+        self.apply_button.setText("Apply and Preview")
+        self._worker.deleteLater()
+        self._worker = None
+        QMessageBox.critical(self, "Error", f"Failed to apply changes:\n{msg}")
 
     def isComplete(self):
         return self.world_manager is not None and self.world_manager.world_name is not None
