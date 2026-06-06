@@ -6,19 +6,13 @@ from PyQt5.QtGui import (
     QBrush, QColor, QFont, QImage, QPainter, QPen, QPixmap,
 )
 from PyQt5.QtWidgets import (
-    QComboBox, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QMessageBox, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
-    QWizardPage,
+    QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QMessageBox, QSizePolicy, QVBoxLayout, QWidget, QWizardPage,
 )
+from classes.responsive_widgets import WrapButton
 
 from utils.config import MAPS_DIR
 
-
-def _btn(text, role=None):
-    b = QPushButton(text)
-    if role:
-        b.setProperty("btnRole", role)
-    return b
 
 
 class MapGenerationPage(QWizardPage):
@@ -45,30 +39,28 @@ class MapGenerationPage(QWizardPage):
         ng_layout.addWidget(self.map_name_input)
         left_layout.addWidget(name_group)
 
-        # YAML settings
+        # YAML settings — QFormLayout keeps labels to the left of inputs
         yaml_group = QGroupBox("Map Settings (YAML)")
-        yg_layout = QVBoxLayout(yaml_group)
-        yg_layout.setSpacing(3)
-
-        def _row(label_text, widget):
-            lbl = QLabel(label_text)
-            lbl.setStyleSheet("font-size: 9pt;")
-            yg_layout.addWidget(lbl)
-            yg_layout.addWidget(widget)
+        yg_layout = QFormLayout(yaml_group)
+        yg_layout.setSpacing(5)
+        yg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self.image_name_label = QLabel("my_map.pgm")
         self.image_name_label.setStyleSheet("color: #7F8C8D; font-size: 9pt; padding: 2px 4px;")
-        _row("Image file (auto)", self.image_name_label)
+        yg_layout.addRow("Image (auto)", self.image_name_label)
 
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(["trinary", "scale", "raw"])
-        _row("Mode", self.mode_combo)
+        yg_layout.addRow("Mode", self.mode_combo)
 
         self.resolution_input = QLineEdit("0.05")
         self.resolution_input.textChanged.connect(self._schedule_preview)
-        _row("Resolution (m/px)", self.resolution_input)
+        yg_layout.addRow("Res. (m/px)", self.resolution_input)
 
-        origin_row = QHBoxLayout()
+        origin_widget = QWidget()
+        origin_row = QHBoxLayout(origin_widget)
+        origin_row.setContentsMargins(0, 0, 0, 0)
+        origin_row.setSpacing(4)
         self.origin_x_input = QLineEdit()
         self.origin_x_input.setPlaceholderText("X")
         self.origin_x_input.textChanged.connect(self._schedule_preview)
@@ -77,24 +69,24 @@ class MapGenerationPage(QWizardPage):
         self.origin_y_input.textChanged.connect(self._schedule_preview)
         origin_row.addWidget(self.origin_x_input)
         origin_row.addWidget(self.origin_y_input)
-        yg_layout.addWidget(QLabel("Origin  X  /  Y  (m):"))
-        yg_layout.addLayout(origin_row)
+        yg_layout.addRow("Origin X/Y", origin_widget)
 
         self.negate_combo = QComboBox()
         self.negate_combo.addItems(["0", "1"])
-        _row("Negate", self.negate_combo)
+        yg_layout.addRow("Negate", self.negate_combo)
 
         self.occ_thresh_input = QLineEdit("0.65")
-        _row("Occupied threshold", self.occ_thresh_input)
+        yg_layout.addRow("Occ. thresh", self.occ_thresh_input)
 
         self.free_thresh_input = QLineEdit("0.25")
-        _row("Free threshold", self.free_thresh_input)
+        yg_layout.addRow("Free thresh", self.free_thresh_input)
 
         left_layout.addWidget(yaml_group)
         left_layout.addStretch(1)
 
-        self.generate_button = _btn("Generate Map", "success")
+        self.generate_button = WrapButton("Generate Map", "success")
         self.generate_button.clicked.connect(self._generate_map)
+        self.generate_button.setMinimumHeight(36)
         left_layout.addWidget(self.generate_button)
 
         # ── Preview panel ──────────────────────────────────────────

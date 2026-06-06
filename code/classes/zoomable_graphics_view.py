@@ -7,13 +7,15 @@ class ZoomableGraphicsView(QGraphicsView):
         super().__init__(scene)
         self.scale_label = QLabel("1 pixel = 10 cm", self)
         self.scale_label.setStyleSheet("background: transparent; font-size: 11pt; font-weight: bold; color: red;")
-        self.scale_label.setGeometry(10, self.height() - 38, 105, 20)
+        self.scale_label.adjustSize()
+        self.scale_label.move(10, 10)
         self.is_panning = False
         self.last_pan_point = QPoint()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.scale_label.move(10, self.height() - 38)
+        self.scale_label.adjustSize()
+        self.scale_label.move(10, self.height() - self.scale_label.height() - 8)
 
     def wheelEvent(self, event):
         zoom_factor = 1.25 if event.angleDelta().y() > 0 else 0.8

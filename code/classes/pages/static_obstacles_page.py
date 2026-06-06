@@ -1,19 +1,13 @@
 from PyQt5.QtWidgets import (
-    QWizardPage, QHBoxLayout, QVBoxLayout, QComboBox, QListWidget,
-    QPushButton, QLineEdit, QMessageBox, QWidget, QGroupBox, QLabel,
+    QWizardPage, QHBoxLayout, QVBoxLayout, QFormLayout, QComboBox,
+    QListWidget, QLineEdit, QMessageBox, QWidget, QGroupBox, QLabel,
     QSizePolicy,
 )
 from PyQt5.QtCore import Qt, QEvent, QPointF
 from PyQt5.QtGui import QColor
 from classes.zoomable_graphics_view import ZoomableGraphicsView
 from classes.apply_worker import ApplyWorker
-
-
-def _btn(text, role=None):
-    b = QPushButton(text)
-    if role:
-        b.setProperty("btnRole", role)
-    return b
+from classes.responsive_widgets import WrapButton
 
 
 class StaticObstaclesPage(QWizardPage):
@@ -45,46 +39,42 @@ class StaticObstaclesPage(QWizardPage):
         lg_layout = QVBoxLayout(list_group)
         lg_layout.setSpacing(6)
         self.obstacle_list = QListWidget()
-        self.obstacle_list.setFixedHeight(120)
+        self.obstacle_list.setFixedHeight(110)
         lg_layout.addWidget(self.obstacle_list)
-        self.remove_obstacle_button = _btn("Remove Selected", "danger")
+        self.remove_obstacle_button = WrapButton("Remove Selected", "danger")
         self.remove_obstacle_button.clicked.connect(self.remove_selected_obstacle)
         lg_layout.addWidget(self.remove_obstacle_button)
         left_layout.addWidget(list_group)
 
-        # Dimensions group
+        # Dimensions group — QFormLayout keeps labels to the left of inputs
         dims_group = QGroupBox("Dimensions")
-        dg_layout = QVBoxLayout(dims_group)
+        dg_layout = QFormLayout(dims_group)
         dg_layout.setSpacing(6)
+        dg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         self._lbl_w = QLabel("Width (m)")
-        dg_layout.addWidget(self._lbl_w)
         self.width_input = QLineEdit()
         self.width_input.setPlaceholderText("0.5")
-        dg_layout.addWidget(self.width_input)
+        dg_layout.addRow(self._lbl_w, self.width_input)
 
         self._lbl_l = QLabel("Length (m)")
-        dg_layout.addWidget(self._lbl_l)
         self.length_input = QLineEdit()
         self.length_input.setPlaceholderText("0.5")
-        dg_layout.addWidget(self.length_input)
+        dg_layout.addRow(self._lbl_l, self.length_input)
 
         self._lbl_h = QLabel("Height (m)")
-        dg_layout.addWidget(self._lbl_h)
         self.height_input = QLineEdit()
         self.height_input.setPlaceholderText("1.0")
-        dg_layout.addWidget(self.height_input)
+        dg_layout.addRow(self._lbl_h, self.height_input)
 
         self._lbl_r = QLabel("Radius (m)")
-        dg_layout.addWidget(self._lbl_r)
         self.radius_input = QLineEdit()
         self.radius_input.setPlaceholderText("0.5")
-        dg_layout.addWidget(self.radius_input)
+        dg_layout.addRow(self._lbl_r, self.radius_input)
 
-        dg_layout.addWidget(QLabel("Color"))
         self.color_input = QLineEdit()
         self.color_input.setPlaceholderText("Gray, Red, Blue …")
-        dg_layout.addWidget(self.color_input)
+        dg_layout.addRow("Color", self.color_input)
         left_layout.addWidget(dims_group)
 
         hint = QLabel("Click on the canvas to place the obstacle")
@@ -94,8 +84,9 @@ class StaticObstaclesPage(QWizardPage):
 
         left_layout.addStretch(1)
 
-        self.apply_button = _btn("Apply and Preview", "success")
+        self.apply_button = WrapButton("Apply and Preview", "success")
         self.apply_button.clicked.connect(self.apply_changes)
+        self.apply_button.setMinimumHeight(36)
         left_layout.addWidget(self.apply_button)
 
         # ── Canvas ─────────────────────────────────────────────────
