@@ -17,13 +17,13 @@ from utils.color_utils import get_color
 import math
 
 _NAV_LABELS = [
-    "  Welcome",
-    "  Select Simulation",
-    "  Design Walls",
-    "  Static Obstacles",
-    "  Dynamic Obstacles",
-    "  Map Generation",
-    "  Coming Soon",
+    "Welcome",
+    "Select Simulation",
+    "Design Walls",
+    "Static Obstacles",
+    "Dynamic Obstacles",
+    "Map Generation",
+    "Coming Soon",
 ]
 
 _PAGE_NAMES = [
@@ -39,7 +39,7 @@ QListWidget {
     border: none;
     padding: 6px 4px;
     outline: none;
-    font-size: 10pt;
+    font-size: 12pt;
 }
 QListWidget::item {
     padding: 11px 10px;
@@ -102,8 +102,12 @@ class DynamicWorldWizard(QWizard):
 
         self.nav_list = QListWidget()
         self.nav_list.addItems(_NAV_LABELS)
-        self.nav_list.setFont(QFont("Arial", 10))
+        for i in range(self.nav_list.count()):
+            self.nav_list.item(i).setTextAlignment(Qt.AlignCenter)
+        self.nav_list.setFont(QFont("Arial", 11))
         self.nav_list.setStyleSheet(_SIDEBAR_QSS)
+        self.nav_list.setWordWrap(True)
+        self.nav_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.nav_list.setCurrentRow(0)
         self.nav_list.itemClicked.connect(self.navigate_to_page)
         sidebar_layout.addWidget(self.nav_list, 1)
@@ -138,6 +142,7 @@ class DynamicWorldWizard(QWizard):
 
         sim_selection_page.simulationSelected.connect(self.initialize_world_manager)
         self.currentIdChanged.connect(self.update_navigation)
+        self.showMaximized()
 
     # ── Size management ────────────────────────────────────────────────────
 
@@ -173,8 +178,8 @@ class DynamicWorldWizard(QWizard):
 
     def _apply_responsive_layout(self):
         w = max(self.width(), 1000)
-        # Sidebar nav list: 15-20 % of window, clamped [180, 240]
-        nav_w = max(min(int(w * 0.17), 240), 180)
+        # Sidebar nav list: clamped [200, 260]
+        nav_w = max(min(int(w * 0.17), 260), 200)
         self.nav_list.setFixedWidth(nav_w)
 
         content_w = w - nav_w
