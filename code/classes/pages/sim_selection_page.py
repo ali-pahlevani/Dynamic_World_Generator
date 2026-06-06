@@ -3,9 +3,40 @@ from PyQt5.QtWidgets import (
     QLabel, QPushButton, QFrame, QSizePolicy,
 )
 from PyQt5.QtGui import QFont, QPixmap
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, QSize, pyqtSignal
 from utils.config import INTRO_IMAGES_DIR
 import os
+
+
+class _ScaledPixmapLabel(QLabel):
+    """QLabel that rescales its pixmap to fill available space on every resize."""
+    def __init__(self):
+        super().__init__()
+        self._source = None
+        self.setAlignment(Qt.AlignCenter)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumHeight(80)
+
+    def setSourcePixmap(self, pixmap):
+        self._source = pixmap
+        self._refresh()
+
+    def sizeHint(self):
+        return QSize(280, 260)
+
+    def minimumSizeHint(self):
+        return QSize(80, 100)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._refresh()
+
+    def _refresh(self):
+        if self._source and self.width() > 0 and self.height() > 0:
+            scaled = self._source.scaled(
+                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            super().setPixmap(scaled)
 
 _CARD_BASE = """
     QWidget {{
@@ -51,39 +82,40 @@ def _make_card(image_path, scale_w, scale_h, title_text, button_text,
         _CARD_BASE.format(bg="#FFFFFF", border="#D5D8DC")
     )
     card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    card.setMaximumHeight(440)
     vbox = QVBoxLayout(card)
-    vbox.setContentsMargins(20, 20, 20, 20)
-    vbox.setSpacing(12)
+    vbox.setContentsMargins(20, 16, 20, 16)
+    vbox.setSpacing(10)
 
-    img_label = QLabel()
-    img_label.setAlignment(Qt.AlignCenter)
+    img_label = _ScaledPixmapLabel()
     if os.path.exists(image_path):
-        pixmap = QPixmap(image_path).scaled(scale_w, scale_h,
-                                            Qt.KeepAspectRatio,
-                                            Qt.SmoothTransformation)
-        img_label.setPixmap(pixmap)
+        img_label.setSourcePixmap(QPixmap(image_path))
     else:
         img_label.setText("Image not found")
         img_label.setStyleSheet("color: #95A5A6;")
-    img_label.setFixedHeight(240)
-    vbox.addWidget(img_label)
+    vbox.addWidget(img_label, 1)  # stretch=1: image fills most of card
 
     title = QLabel(title_text)
     title.setAlignment(Qt.AlignCenter)
-    if badge:
-        title.setText(f"{title_text}  <span style='color:#27AE60;font-size:9pt;'>{badge}</span>")
-        title.setTextFormat(Qt.RichText)
     title.setStyleSheet(
-        "font-size: 13pt; font-weight: bold; color: #2C3E50; "
+        "font-size: 15pt; font-weight: bold; color: #2C3E50; "
         "background-color: transparent; border: none;"
     )
     vbox.addWidget(title)
+
+    if badge:
+        badge_label = QLabel(badge)
+        badge_label.setAlignment(Qt.AlignCenter)
+        badge_label.setStyleSheet(
+            "font-size: 11pt; color: #27AE60; "
+            "background-color: transparent; border: none;"
+        )
+        vbox.addWidget(badge_label)
 
     btn = QPushButton(button_text)
     btn.setEnabled(enabled)
     btn.setStyleSheet(_BUTTON_ACTIVE if enabled else _BUTTON_DISABLED)
     vbox.addWidget(btn)
-    vbox.addStretch(1)
 
     return card, btn
 
@@ -169,7 +201,9 @@ class SimSelectionPage(QWizardPage):
         )
         cards_row.addWidget(isaac_card)
 
-        root_layout.addLayout(cards_row, 1)
+        root_layout.addStretch(1)
+        root_layout.addLayout(cards_row)
+        root_layout.addStretch(1)
 
         # Selection status label
         self.status_label = QLabel("")
