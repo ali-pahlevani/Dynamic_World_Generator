@@ -250,6 +250,12 @@ class WallsDesignPage(QWizardPage):
     def _on_applied(self, errors):
         self.apply_button.setEnabled(True)
         self.apply_button.setText("Apply and Preview")
+        # Apply may have renumbered walls to close gaps — rebuild the list
+        # so displayed names match world_manager.models again.
+        self.wall_list.clear()
+        for m in self.world_manager.models:
+            if m["type"] == "wall" and m["status"] != "removed":
+                self.wall_list.addItem(m["name"])
         self.wizard().refresh_canvas(self.scene)
         self._worker.deleteLater()
         self._worker = None
