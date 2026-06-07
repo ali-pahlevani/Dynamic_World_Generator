@@ -112,7 +112,7 @@ class WallsDesignPage(QWizardPage):
         )
 
     def _next_wall_name(self):
-        existing = {m["name"] for m in self.world_manager.models}
+        existing = {m["name"] for m in self.world_manager.models if m["status"] != "removed"}
         idx = 1
         while f"wall_{idx}" in existing:
             idx += 1
@@ -227,7 +227,12 @@ class WallsDesignPage(QWizardPage):
             self.scene.removeItem(text)
         for m in self.world_manager.models:
             if m["name"] == name:
-                m["status"] = "removed"
+                if m["status"] == "new":
+                    # Never pushed to Gazebo — drop it outright so its name
+                    # is immediately free for reuse by the next wall drawn.
+                    self.world_manager.models.remove(m)
+                else:
+                    m["status"] = "removed"
                 break
         self.wall_list.takeItem(self.wall_list.row(selected))
 

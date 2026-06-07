@@ -9,6 +9,7 @@ from utils.color_utils import get_color
 from utils.config import PROJECT_ROOT, WORLDS_GAZEBO_DIR
 
 _VALID_WORLD_NAME = re.compile(r'^[A-Za-z0-9_]+$')
+_NUMBERED_NAME_RE = re.compile(r'^(.+)_(\d+)$')
 
 
 class WorldManager:
@@ -171,9 +172,60 @@ class WorldManager:
     def add_model(self, model):
         for existing_model in self.models:
             if existing_model["name"] == model["name"]:
+                reused_removed = existing_model["status"] == "removed"
                 existing_model.update(model)
+                if reused_removed:
+                    # The freed-up name belonged to a model that is still (or
+                    # was) live in Gazebo — delete that entity, then create
+                    # this one in its place, instead of overwriting "removed".
+                    existing_model["status"] = "updated"
                 return
         self.models.append(model)
+
+    def _renumber_models(self):
+        """Close numbering gaps left by removed models, e.g. wall_1, wall_3
+        becomes wall_1, wall_2 (and similarly box_/cylinder_/sphere_, each
+        numbered independently) once Apply is pushed.
+
+        Gazebo has no rename service, so a model that is already live there
+        can only be renamed by deleting the old-named entity and creating a
+        new-named one with the same properties; entries that were never
+        pushed (status "new") are simply renamed in place. All deletions are
+        applied before any creation so a freed-up name is never claimed
+        before its previous occupant is gone.
+        """
+        groups = {}
+        for m in self.models:
+            if m["status"] == "removed":
+                continue
+            match = _NUMBERED_NAME_RE.match(m["name"])
+            if match:
+                groups.setdefault(match.group(1), []).append((m, int(match.group(2))))
+
+        removals, creations = [], []
+        for prefix, members in groups.items():
+            members.sort(key=lambda pair: pair[1])
+            for idx, (m, _) in enumerate(members, start=1):
+                new_name = f"{prefix}_{idx}"
+                if m["name"] == new_name:
+                    continue
+                if m["status"] == "new":
+                    m["name"] = new_name
+                    continue
+                removals.append({
+                    "name": m["name"],
+                    "type": m["type"],
+                    "properties": dict(m["properties"]),
+                    "status": "removed",
+                })
+                m["name"] = new_name
+                m["status"] = "new"
+                creations.append(m)
+
+        if removals or creations:
+            creation_ids = {id(m) for m in creations}
+            remaining = [m for m in self.models if id(m) not in creation_ids]
+            self.models = remaining + removals + creations
 
     def apply_changes(self):
         """Push pending model changes to the running Gazebo simulation.
@@ -223,6 +275,8 @@ class WorldManager:
                 self.script_process.kill()
                 self.script_process.wait(timeout=2)
             self.script_process = None
+
+        self._renumber_models()
 
         errors = []          # (name, message)
         applied_names = set()  # models successfully pushed to Gazebo
@@ -303,7 +357,8 @@ class WorldManager:
                 self.save_sdf(self.world_path)
                 applied_names.add(name)
 
-        dynamic_models = [m for m in self.models if "motion" in m["properties"]]
+        dynamic_models = [m for m in self.models
+                          if m["status"] != "removed" and "motion" in m["properties"]]
         if dynamic_models:
             move_code_dir = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code")
             os.makedirs(move_code_dir, exist_ok=True)
