@@ -196,6 +196,16 @@ class DynamicWorldWizard(QWizard):
         if hasattr(self, "map_generation_page"):
             self.map_generation_page.left_widget.setFixedWidth(left_w)
 
+        # Walls / Placed Obstacles / Select Obstacle lists: grow up to 192px
+        # when there's room, shrinking gracefully (and never overlapping the
+        # controls below) as the wizard gets shorter — Qt's layout engine
+        # handles the available-space calculation for us.
+        for lst in (self.walls_page.wall_list,
+                    self.static_obstacles_page.obstacle_list,
+                    self.dynamic_obstacles_page.obstacle_list):
+            lst.setMinimumHeight(0)
+            lst.setMaximumHeight(192)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._apply_responsive_layout()

@@ -34,7 +34,6 @@ class DynamicObstaclesPage(QWizardPage):
         sg_layout = QVBoxLayout(sel_group)
         sg_layout.setSpacing(6)
         self.obstacle_list = QListWidget()
-        self.obstacle_list.setFixedHeight(110)
         self.obstacle_list.itemClicked.connect(self.select_obstacle)
         sg_layout.addWidget(self.obstacle_list)
         left_layout.addWidget(sel_group)
