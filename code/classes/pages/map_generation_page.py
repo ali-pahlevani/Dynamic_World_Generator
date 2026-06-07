@@ -1,7 +1,7 @@
 import math
 import os
 
-from PyQt5.QtCore import Qt, QSize, QTimer
+from PyQt5.QtCore import Qt, QEvent, QSize, QTimer
 from PyQt5.QtGui import (
     QBrush, QColor, QFont, QImage, QPainter, QPen, QPixmap,
 )
@@ -118,6 +118,12 @@ class MapGenerationPage(QWizardPage):
         self.preview_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.preview_label.setText("No world loaded — map preview will appear here")
         self.preview_label.setFont(QFont("Arial", 10))
+        self.preview_label.setMouseTracking(True)
+        self.preview_label.installEventFilter(self)
+
+        self.coord_label = QLabel("X: — | Y: —", self.preview_label)
+        self.coord_label.setStyleSheet("background: transparent; font-size: 11pt; font-weight: bold; color: #2C3E50;")
+        self.coord_label.adjustSize()
 
         # ── Main layout ────────────────────────────────────────────
         layout = QHBoxLayout(self)
@@ -313,10 +319,57 @@ class MapGenerationPage(QWizardPage):
         available = self.preview_label.size()
         scaled = pixmap.scaled(available, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.preview_label.setPixmap(scaled)
+        self._reposition_coord_label()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_preview_display()
+
+    # ── Coordinate readout ─────────────────────────────────────────────────
+
+    def _reposition_coord_label(self):
+        self.coord_label.adjustSize()
+        self.coord_label.move(self.preview_label.width() - self.coord_label.width() - 10,
+                              self.preview_label.height() - self.coord_label.height() - 8)
+
+    def _reset_coord_label(self):
+        self.coord_label.setText("X: — | Y: —")
+        self._reposition_coord_label()
+
+    def _update_coord_label(self, pos):
+        pixmap = self.preview_label.pixmap()
+        if pixmap is None or pixmap.isNull() or self._current_qimage is None:
+            self._reset_coord_label()
+            return
+
+        # The pixmap is centered within the label (KeepAspectRatio scaling).
+        offset_x = (self.preview_label.width() - pixmap.width()) / 2
+        offset_y = (self.preview_label.height() - pixmap.height()) / 2
+        px = pos.x() - offset_x
+        py = pos.y() - offset_y
+        if not (0 <= px < pixmap.width() and 0 <= py < pixmap.height()):
+            self._reset_coord_label()
+            return
+
+        img_w, img_h = self._current_qimage.width(), self._current_qimage.height()
+        scale = pixmap.width() / img_w
+        col = px / scale
+        row = py / scale
+
+        resolution = self._parse_resolution()
+        ox, oy = self._parse_origin()
+        wx = ox + col * resolution
+        wy = oy + (img_h - 1 - row) * resolution
+        self.coord_label.setText(f"X: {wx:.2f} | Y: {wy:.2f}")
+        self._reposition_coord_label()
+
+    def eventFilter(self, obj, event):
+        if obj == self.preview_label:
+            if event.type() == QEvent.MouseMove:
+                self._update_coord_label(event.pos())
+            elif event.type() == QEvent.Leave:
+                self._reset_coord_label()
+        return super().eventFilter(obj, event)
 
     # ── Map generation ────────────────────────────────────────────────────
 
