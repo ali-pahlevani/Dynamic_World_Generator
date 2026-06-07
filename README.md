@@ -176,7 +176,7 @@ Click the *Select* button on your chosen card, then click *Next*.
 
 * **Create or Load World**: Enter a world name (letters, numbers, underscores only) and click *Create New* or *Load*.
 * **Draw Walls**: Set width (*m*), height (*m*), and color, then click twice on the canvas to place a wall (start → end point). Each wall appears as a line on the canvas.
-* **Remove Walls**: Select a wall from the list, click *Remove Selected*.
+* **Remove / Undo**: Select a wall from the list and click *Remove Selected* to delete it; click *Undo* to bring back the most recently removed wall — click repeatedly to step back through multiple removals, in list and on canvas alike.
 * **Apply**: *Apply and Preview* saves to the *SDF* file and pushes to the live *Gazebo* session.
 * **Canvas Controls**: Scroll wheel to zoom, middle mouse button to pan.
 
@@ -186,7 +186,7 @@ Click the *Select* button on your chosen card, then click *Next*.
 
 * **Types**: Box (width × length × height), Cylinder (radius × height), Sphere (radius).
 * **Placement**: Set dimensions and color, then click the canvas to drop the obstacle at that position.
-* **Remove**: Select from the list and click *Remove Selected*.
+* **Remove / Undo**: Select an obstacle from the list and click *Remove Selected* to delete it; click *Undo* to bring back the most recently removed obstacle — click repeatedly to step back through multiple removals, in list and on canvas alike.
 * **Apply**: *Apply and Preview* updates the *SDF* and *Gazebo*.
 
 <img width="1857" height="1048" alt="Static Obstacles" src="https://github.com/user-attachments/assets/ba77c7e7-3d8a-4236-9d48-de91fa62271b" />
@@ -242,7 +242,7 @@ Click *Finish* to close the wizard.
 * **Isaac Sim Support**: Full integration with *Isaac Sim 4.5.0*, *5.0.0*, and *5.1.0*.
 * **Additional Motion Types**: Sinusoidal, random walk, or spline-based paths.
 * **Export Options**: Direct *ROS 2* package export, *Unity*, or other simulator formats.
-* **UI Enhancements**: Undo/redo, 3D preview, drag-and-drop obstacle placement.
+* **UI Enhancements**: Redo, 3D preview, drag-and-drop obstacle placement.
 * **And definitely a lot more!**
 
 I'd **love collaborations**! Contribute via pull requests on *GitHub* for bug fixes, new features, or documentation improvements. Open a *GitHub Issue* for questions, suggestions, or partnership ideas.
