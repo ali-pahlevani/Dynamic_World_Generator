@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QEvent, QPointF
 from PyQt5.QtGui import QColor
 from classes.zoomable_graphics_view import ZoomableGraphicsView
 from classes.apply_worker import ApplyWorker
-from classes.responsive_widgets import WrapButton
+from classes.responsive_widgets import WrapButton, ButtonRow
 
 
 class StaticObstaclesPage(QWizardPage):
@@ -42,8 +42,12 @@ class StaticObstaclesPage(QWizardPage):
         lg_layout.addWidget(self.obstacle_list)
         self.remove_obstacle_button = WrapButton("Remove Selected", "danger")
         self.remove_obstacle_button.clicked.connect(self.remove_selected_obstacle)
-        lg_layout.addWidget(self.remove_obstacle_button)
+        self.undo_obstacle_button = WrapButton("Undo", "secondary")
+        self.undo_obstacle_button.setEnabled(False)
+        self.undo_obstacle_button.clicked.connect(self.undo_remove_obstacle)
+        lg_layout.addWidget(ButtonRow(self.remove_obstacle_button, self.undo_obstacle_button))
         left_layout.addWidget(list_group)
+        self._removed_obstacles = []
 
         # Dimensions group — QFormLayout keeps labels to the left of inputs
         dims_group = QGroupBox("Dimensions")
@@ -115,6 +119,8 @@ class StaticObstaclesPage(QWizardPage):
 
     def _refresh_list(self):
         self.obstacle_list.clear()
+        self._removed_obstacles.clear()
+        self.undo_obstacle_button.setEnabled(False)
         self.wizard().refresh_canvas(self.scene)
         for m in self.world_manager.models:
             if m["type"] in ("box", "cylinder", "sphere"):
@@ -202,15 +208,12 @@ class StaticObstaclesPage(QWizardPage):
         if not selected:
             return
         name = selected.text()
-        if name in self.wizard().obstacle_items:
-            item, text = self.wizard().obstacle_items.pop(name)
-            self.scene.removeItem(item)
-            self.scene.removeItem(text)
-        if name in self.wizard().path_items:
-            for pi in self.wizard().path_items.pop(name):
-                self.scene.removeItem(pi)
-        for m in self.world_manager.models:
+        row = self.obstacle_list.row(selected)
+
+        model = model_index = original_status = None
+        for i, m in enumerate(self.world_manager.models):
             if m["name"] == name:
+                model, model_index, original_status = m, i, m["status"]
                 if m["status"] == "new":
                     # Never pushed to Gazebo — drop it outright so its name
                     # is immediately free for reuse by the next obstacle drawn.
@@ -218,7 +221,43 @@ class StaticObstaclesPage(QWizardPage):
                 else:
                     m["status"] = "removed"
                 break
-        self.obstacle_list.takeItem(self.obstacle_list.row(selected))
+
+        if name in self.wizard().obstacle_items:
+            item, text = self.wizard().obstacle_items.pop(name)
+            self.scene.removeItem(item)
+            self.scene.removeItem(text)
+        if name in self.wizard().path_items:
+            for pi in self.wizard().path_items.pop(name):
+                self.scene.removeItem(pi)
+        self.obstacle_list.takeItem(row)
+
+        if model is not None:
+            self._removed_obstacles.append({
+                "model": model,
+                "model_index": model_index,
+                "original_status": original_status,
+                "row": row,
+                "name": name,
+            })
+            self.undo_obstacle_button.setEnabled(True)
+
+    def undo_remove_obstacle(self):
+        if not self._removed_obstacles or not self.world_manager:
+            return
+        last = self._removed_obstacles.pop()
+        model = last["model"]
+        if last["original_status"] == "new":
+            idx = min(last["model_index"], len(self.world_manager.models))
+            self.world_manager.models.insert(idx, model)
+        else:
+            model["status"] = last["original_status"]
+
+        row = min(last["row"], self.obstacle_list.count())
+        self.obstacle_list.insertItem(row, last["name"])
+        self.obstacle_list.setCurrentRow(row)
+        self.wizard().refresh_canvas(self.scene)
+
+        self.undo_obstacle_button.setEnabled(bool(self._removed_obstacles))
 
     def apply_changes(self):
         if not self.world_manager:
@@ -236,8 +275,12 @@ class StaticObstaclesPage(QWizardPage):
         self.apply_button.setEnabled(True)
         self.apply_button.setText("Apply and Preview")
         # Apply may have renumbered obstacles to close gaps — rebuild the
-        # list so displayed names match world_manager.models again.
+        # list so displayed names match world_manager.models again, and drop
+        # any pending undo history since the removed models' names/indices
+        # may now be stale.
         self.obstacle_list.clear()
+        self._removed_obstacles.clear()
+        self.undo_obstacle_button.setEnabled(False)
         for m in self.world_manager.models:
             if m["type"] in ("box", "cylinder", "sphere") and m["status"] != "removed":
                 self.obstacle_list.addItem(m["name"])
