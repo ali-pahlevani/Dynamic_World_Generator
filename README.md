@@ -1,6 +1,6 @@
 # Dynamic World Generator Wizard (V2)
 
-![Dynamic World Generator Wizard Banner](https://github.com/user-attachments/assets/1b00aa22-24d7-40f1-8526-a3612bd7f503)
+![Dynamic World Generator Wizard Banner](https://github.com/user-attachments/assets/db8eade3-d841-48b7-86bc-3f99ee8737c4)
 
 **Dynamic World Generator Wizard** is a *PyQt5*-based graphical wizard application for building and managing dynamic simulation worlds. V2 adds full **Gazebo Ionic** support, a **Map Generation** step that exports a *ROS 2*-compatible occupancy grid map (`.pgm` + `.yaml`) directly from the designed world, and a fully responsive UI that adapts to any window size.
 
@@ -158,7 +158,7 @@ The wizard walks you through every step sequentially. Each page can be revisited
 
 An animated overview of the application. Click *Next* to begin.
 
-<img width="1857" height="1048" alt="Welcome Page" src="https://github.com/user-attachments/assets/7bbd4df6-e7d6-4bad-8743-cbef0037cfc5" />
+<img width="1857" height="1048" alt="Welcome Page" src="https://github.com/user-attachments/assets/9ab5ce2f-359f-44f3-8d07-f2c0c172e144" />
 
 ### Step 2: Select Simulation
 
@@ -170,7 +170,7 @@ Three platforms are available, in this order:
 
 Click the *Select* button on your chosen card, then click *Next*.
 
-<img width="1857" height="1048" alt="Simulation Selection" src="https://github.com/user-attachments/assets/7d7aa432-506c-49c9-9ad2-50e3b1d29ad7" />
+<img width="1857" height="1048" alt="Simulation Selection" src="https://github.com/user-attachments/assets/4b79cdf5-74ce-45dc-812d-f28a4ce7e9b9" />
 
 ### Step 3: Design Walls
 
@@ -180,7 +180,7 @@ Click the *Select* button on your chosen card, then click *Next*.
 * **Apply**: *Apply and Preview* saves to the *SDF* file and pushes to the live *Gazebo* session.
 * **Canvas Controls**: Scroll wheel to zoom, middle mouse button to pan.
 
-<img width="1857" height="1048" alt="Walls Design" src="https://github.com/user-attachments/assets/522a2955-2ce6-49a9-a17e-8fd4d751ad32" />
+<img width="1857" height="1048" alt="Walls Design" src="https://github.com/user-attachments/assets/1ccd6f92-d824-4de4-8e70-e5c75bd251fa" />
 
 ### Step 4: Static Obstacles
 
@@ -189,7 +189,7 @@ Click the *Select* button on your chosen card, then click *Next*.
 * **Remove**: Select from the list and click *Remove Selected*.
 * **Apply**: *Apply and Preview* updates the *SDF* and *Gazebo*.
 
-<img width="1857" height="1048" alt="Static Obstacles" src="https://github.com/user-attachments/assets/2f1c0359-c13b-42ad-8213-d121789d3b4f" />
+<img width="1857" height="1048" alt="Static Obstacles" src="https://github.com/user-attachments/assets/ba77c7e7-3d8a-4236-9d48-de91fa62271b" />
 
 ### Step 5: Dynamic Obstacles
 
@@ -204,7 +204,7 @@ Click the *Select* button on your chosen card, then click *Next*.
   * `worlds/gazebo/{version}/move_code/{world}_moveObstacles.py` — motion script
   * `worlds/gazebo/{version}/move_code/{world}_launch.sh` — launcher for that script
 
-<img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/b287e0b4-e7d1-41d3-8f04-daedb002bf95" />
+<img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/3169328f-2664-4b7b-989b-8696799237c6" />
 
 ### Step 6: Map Generation
 
@@ -221,6 +221,8 @@ This step renders all static geometry (walls, boxes, cylinders, spheres) into a 
   * `{map_name}.pgm` — grayscale occupancy image (P5 binary PGM)
   * `{map_name}.yaml` — *ROS 2* map metadata file
 
+<img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/647b8e11-265d-4e1c-83e0-09fb986e2201" />
+
 ### Step 7: Coming Soon
 
 Teasers for planned simulator support:
@@ -231,7 +233,7 @@ Teasers for planned simulator support:
 
 Click *Finish* to close the wizard.
 
-<img width="1857" height="1048" alt="Coming Soon" src="https://github.com/user-attachments/assets/56a646ee-42cc-4d98-b168-8dd1ad0e1214" />
+<img width="1857" height="1048" alt="Coming Soon" src="https://github.com/user-attachments/assets/6f95d04d-4398-4778-8dca-beb63755aa04" />
 
 ## Future Visions
 
