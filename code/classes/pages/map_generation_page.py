@@ -1,7 +1,7 @@
 import math
 import os
 
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import (
     QBrush, QColor, QFont, QImage, QPainter, QPen, QPixmap,
 )
@@ -13,6 +13,25 @@ from classes.responsive_widgets import WrapButton
 
 from utils.config import MAPS_DIR
 
+
+class _PreviewLabel(QLabel):
+    """QLabel whose size hints stay constant regardless of pixmap content.
+
+    A plain QLabel's sizeHint()/minimumSizeHint() grow to match whatever
+    pixmap is loaded (the rendered map can be far larger than the page's
+    placeholder text). QWizard's ModernStyle layout uses the page's size
+    hint to divide vertical space between the page area and the bottom
+    button row, so a swelling label skews the wizard's button-bar height.
+    Fixing the hints to constants — the same trick used by
+    _ScaledPixmapLabel in sim_selection_page.py / coming_soon_page.py —
+    keeps the wizard's layout identical across pages.
+    """
+
+    def sizeHint(self):
+        return QSize(280, 260)
+
+    def minimumSizeHint(self):
+        return QSize(80, 100)
 
 
 class MapGenerationPage(QWizardPage):
@@ -90,7 +109,7 @@ class MapGenerationPage(QWizardPage):
         left_layout.addWidget(self.generate_button)
 
         # ── Preview panel ──────────────────────────────────────────
-        self.preview_label = QLabel()
+        self.preview_label = _PreviewLabel()
         self.preview_label.setAlignment(Qt.AlignCenter)
         self.preview_label.setStyleSheet(
             "background-color: #F4F6F9;"
