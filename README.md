@@ -154,13 +154,13 @@ Dynamic_World_Generator/
 
 The wizard walks you through every step sequentially. Each page can be revisited using the left-hand navigation sidebar.
 
-### Step 1: Welcome Page
+### Step 1: Welcome
 
 An animated overview of the application. Click *Next* to begin.
 
 <img width="1857" height="1048" alt="Welcome Page" src="https://github.com/user-attachments/assets/7bbd4df6-e7d6-4bad-8743-cbef0037cfc5" />
 
-### Step 2: Select Simulation Platform
+### Step 2: Select Simulation
 
 Three platforms are available, in this order:
 
@@ -182,7 +182,7 @@ Click the *Select* button on your chosen card, then click *Next*.
 
 <img width="1857" height="1048" alt="Walls Design" src="https://github.com/user-attachments/assets/522a2955-2ce6-49a9-a17e-8fd4d751ad32" />
 
-### Step 4: Add Static Obstacles
+### Step 4: Static Obstacles
 
 * **Types**: Box (width × length × height), Cylinder (radius × height), Sphere (radius).
 * **Placement**: Set dimensions and color, then click the canvas to drop the obstacle at that position.
@@ -191,7 +191,7 @@ Click the *Select* button on your chosen card, then click *Next*.
 
 <img width="1857" height="1048" alt="Static Obstacles" src="https://github.com/user-attachments/assets/2f1c0359-c13b-42ad-8213-d121789d3b4f" />
 
-### Step 5: Add Dynamic Obstacles
+### Step 5: Dynamic Obstacles
 
 * **Select Obstacle**: Pick any static obstacle from the list.
 * **Motion Type**:
@@ -206,7 +206,7 @@ Click the *Select* button on your chosen card, then click *Next*.
 
 <img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/b287e0b4-e7d1-41d3-8f04-daedb002bf95" />
 
-### Step 6: Generate Occupancy Map
+### Step 6: Map Generation
 
 This step renders all static geometry (walls, boxes, cylinders, spheres) into a *ROS 2*-compatible occupancy grid map.
 
