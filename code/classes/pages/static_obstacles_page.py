@@ -39,7 +39,6 @@ class StaticObstaclesPage(QWizardPage):
         lg_layout = QVBoxLayout(list_group)
         lg_layout.setSpacing(6)
         self.obstacle_list = QListWidget()
-        self.obstacle_list.setFixedHeight(110)
         lg_layout.addWidget(self.obstacle_list)
         self.remove_obstacle_button = WrapButton("Remove Selected", "danger")
         self.remove_obstacle_button.clicked.connect(self.remove_selected_obstacle)

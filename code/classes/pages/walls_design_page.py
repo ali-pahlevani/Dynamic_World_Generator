@@ -50,7 +50,6 @@ class WallsDesignPage(QWizardPage):
         wls_layout = QVBoxLayout(walls_group)
         wls_layout.setSpacing(6)
         self.wall_list = QListWidget()
-        self.wall_list.setFixedHeight(110)
         wls_layout.addWidget(self.wall_list)
         self.remove_wall_button = WrapButton("Remove Selected", "danger")
         self.remove_wall_button.clicked.connect(self.remove_selected_wall)
