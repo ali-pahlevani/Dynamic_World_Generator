@@ -1,5 +1,9 @@
-from PyQt5.QtWidgets import QWizard, QListWidget, QVBoxLayout, QWidget, QGraphicsScene, QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsTextItem
-from PyQt5.QtCore import Qt, QRectF, QLineF, QPointF, pyqtProperty
+from PyQt5.QtWidgets import (
+    QWizard, QListWidget, QVBoxLayout, QWidget, QLabel,
+    QGraphicsScene, QGraphicsRectItem, QGraphicsEllipseItem,
+    QGraphicsLineItem, QGraphicsTextItem,
+)
+from PyQt5.QtCore import Qt, QRectF, QLineF, QPointF
 from PyQt5.QtGui import QFont, QPen, QColor
 from classes.world_manager import WorldManager
 from classes.pages.welcome_page import WelcomePage
@@ -7,53 +11,122 @@ from classes.pages.sim_selection_page import SimSelectionPage
 from classes.pages.walls_design_page import WallsDesignPage
 from classes.pages.static_obstacles_page import StaticObstaclesPage
 from classes.pages.dynamic_obstacles_page import DynamicObstaclesPage
+from classes.pages.map_generation_page import MapGenerationPage
 from classes.pages.coming_soon_page import ComingSoonPage
 from utils.color_utils import get_color
 import math
 
+_NAV_LABELS = [
+    "Welcome",
+    "Select Simulation",
+    "Design Walls",
+    "Static Obstacles",
+    "Dynamic Obstacles",
+    "Map Generation",
+    "Coming Soon",
+]
+
+_PAGE_NAMES = [
+    "Welcome", "Select Simulation", "Design Walls",
+    "Add Static Obstacles", "Add Dynamic Obstacles",
+    "Generate Map", "Coming Soon",
+]
+
+_SIDEBAR_QSS = """
+QListWidget {
+    background-color: #1E2D3D;
+    color: #8FA8C0;
+    border: none;
+    padding: 6px 4px;
+    outline: none;
+    font-size: 12pt;
+}
+QListWidget::item {
+    padding: 11px 10px;
+    border-radius: 6px;
+    margin: 2px 6px;
+}
+QListWidget::item:selected {
+    background-color: #4A90E2;
+    color: #FFFFFF;
+    font-weight: bold;
+}
+QListWidget::item:hover:!selected {
+    background-color: #2D4057;
+    color: #FFFFFF;
+}
+"""
+
+
 class DynamicWorldWizard(QWizard):
     def __init__(self):
-        # Initialize wizard with window settings and navigation
         super().__init__()
-        self.setWindowFlags(Qt.Window | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint)
-        self.setWindowTitle("Dynamic World Generator Wizard (V1)")
-        self.resize(1600, 800)
-        self.setMinimumWidth(800)
+        self.setWindowFlags(
+            Qt.Window | Qt.WindowMinimizeButtonHint |
+            Qt.WindowMaximizeButtonHint | Qt.WindowCloseButtonHint
+        )
+        self.setWindowTitle("Dynamic World Generator")
+        self.setWizardStyle(QWizard.ModernStyle)
+        self.resize(1600, 860)
+        self.setMinimumSize(1000, 600)
 
-        # Setup scene and model storage
         self.world_manager = None
         self.scene = QGraphicsScene()
         self.wall_items = {}
         self.obstacle_items = {}
         self.path_items = {}
 
-        # Create navigation list
-        self.nav_list = QListWidget()
-        self.nav_list.addItems(["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
-                                "Add Dynamic Obstacles", "Coming Soon"])
-        self.nav_list.setFont(QFont("Arial", 14, QFont.Bold))
-        self.nav_list.setStyleSheet("""
-            QListWidget {
-                background-color: #2E2E2E;
+        # ── Sidebar ────────────────────────────────────────────────
+        sidebar = QWidget()
+        sidebar.setObjectName("dwgSidebar")
+        sidebar.setStyleSheet("QWidget#dwgSidebar { background-color: #1E2D3D; }")
+
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar_layout.setSpacing(0)
+
+        header = QLabel("DWG Wizard")
+        header.setAlignment(Qt.AlignCenter)
+        header.setStyleSheet("""
+            QLabel {
+                background-color: #152330;
                 color: #FFFFFF;
-                border: 1px solid #555555;
-                padding: 5px;
-            }
-            QListWidget::item {
-                padding: 10px;
-            }
-            QListWidget::item:selected {
-                background-color: #4A90E2;
-                color: #FFFFFF;
-            }
-            QListWidget::item:hover {
-                background-color: #666666;
+                font-family: Arial;
+                font-size: 14pt;
+                font-weight: bold;
+                padding: 20px 10px;
+                border-bottom: 2px solid #4A90E2;
             }
         """)
+        sidebar_layout.addWidget(header)
+
+        self.nav_list = QListWidget()
+        self.nav_list.addItems(_NAV_LABELS)
+        for i in range(self.nav_list.count()):
+            self.nav_list.item(i).setTextAlignment(Qt.AlignCenter)
+        self.nav_list.setFont(QFont("Arial", 11))
+        self.nav_list.setStyleSheet(_SIDEBAR_QSS)
+        self.nav_list.setWordWrap(True)
+        self.nav_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.nav_list.setCurrentRow(0)
         self.nav_list.itemClicked.connect(self.navigate_to_page)
+        sidebar_layout.addWidget(self.nav_list, 1)
 
-        # Add wizard pages
+        version_label = QLabel("v2.0")
+        version_label.setAlignment(Qt.AlignCenter)
+        version_label.setStyleSheet("""
+            QLabel {
+                color: #4A6680;
+                font-size: 9pt;
+                padding: 8px;
+                background-color: #152330;
+                border-top: 1px solid #2D4057;
+            }
+        """)
+        sidebar_layout.addWidget(version_label)
+        self.setSideWidget(sidebar)
+
+        # ── Pages ──────────────────────────────────────────────────
         self.addPage(WelcomePage())
         sim_selection_page = SimSelectionPage()
         self.addPage(sim_selection_page)
@@ -63,178 +136,203 @@ class DynamicWorldWizard(QWizard):
         self.addPage(self.static_obstacles_page)
         self.dynamic_obstacles_page = DynamicObstaclesPage(self.scene)
         self.addPage(self.dynamic_obstacles_page)
+        self.map_generation_page = MapGenerationPage()
+        self.addPage(self.map_generation_page)
         self.addPage(ComingSoonPage())
 
-        # Connect signals for world manager and navigation
         sim_selection_page.simulationSelected.connect(self.initialize_world_manager)
         self.currentIdChanged.connect(self.update_navigation)
+        self.showMaximized()
 
-        # Setup sidebar with navigation list
-        side_widget = QWidget()
-        side_layout = QVBoxLayout()
-        side_layout.addWidget(self.nav_list)
-        side_layout.addStretch()
-        side_widget.setLayout(side_layout)
-        self.setSideWidget(side_widget)
+    # ── Size management ────────────────────────────────────────────────────
+
+    def adjustSize(self):
+        # Suppress automatic resizing so page transitions don't jump the window
+        pass
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not getattr(self, "_buttons_styled", False):
+            self._buttons_styled = True
+            self._style_wizard_buttons()
+            # Trigger initial layout pass with the correct window size
+            self._apply_responsive_layout()
+
+    # ── Wizard button styling ──────────────────────────────────────────────
+
+    def _style_wizard_buttons(self):
+        back = self.button(QWizard.BackButton)
+        nxt = self.button(QWizard.NextButton)
+        fin = self.button(QWizard.FinishButton)
+        cancel = self.button(QWizard.CancelButton)
+        for btn, role in [(back, "secondary"), (nxt, "success"),
+                          (fin, "success"), (cancel, "cancel")]:
+            if btn:
+                btn.setProperty("btnRole", role)
+                btn.style().unpolish(btn)
+                btn.style().polish(btn)
+                btn.setMinimumWidth(100)
+                btn.setMinimumHeight(36)
+
+    # ── Responsive layout ──────────────────────────────────────────────────
+
+    def _apply_responsive_layout(self):
+        w = max(self.width(), 1000)
+        # Sidebar nav list: clamped [200, 260]
+        nav_w = max(min(int(w * 0.17), 260), 200)
+        self.nav_list.setFixedWidth(nav_w)
+
+        content_w = w - nav_w
+        canvas_w = int(content_w * 0.73)
+        left_w = content_w - canvas_w
+
+        for page in (self.walls_page, self.static_obstacles_page,
+                     self.dynamic_obstacles_page):
+            page.view.setFixedWidth(canvas_w)
+            if hasattr(page, "left_widget"):
+                page.left_widget.setFixedWidth(left_w)
+
+        # Map page has a preview panel instead of a QGraphicsView
+        if hasattr(self, "map_generation_page"):
+            self.map_generation_page.left_widget.setFixedWidth(left_w)
+
+        # Walls / Placed Obstacles / Select Obstacle lists: grow up to 192px
+        # when there's room, shrinking gracefully (and never overlapping the
+        # controls below) as the wizard gets shorter — Qt's layout engine
+        # handles the available-space calculation for us.
+        for lst in (self.walls_page.wall_list,
+                    self.static_obstacles_page.obstacle_list,
+                    self.dynamic_obstacles_page.obstacle_list):
+            lst.setMinimumHeight(0)
+            lst.setMaximumHeight(192)
 
     def resizeEvent(self, event):
-        # Adjust navigation and page layouts on window resize
         super().resizeEvent(event)
-        window_width = max(self.width(), 800)
-        nav_width = max(min(int(window_width * 0.2), 300), 200)
-        self.nav_list.setFixedWidth(nav_width)
-        font_size = 12 + (nav_width - 200) * (16 - 12) / (300 - 200)
-        self.nav_list.setFont(QFont("Arial", int(font_size), QFont.Bold))
-        content_width = window_width - nav_width
-        canvas_width = int(content_width * 0.7)
-        left_width = content_width - canvas_width
-        
-        # Update canvas and panel widths for design pages
-        if hasattr(self, 'walls_page'):
-            self.walls_page.view.setFixedWidth(canvas_width)
-            for widget in self.walls_page.findChildren(QWidget):
-                if widget.layout() and isinstance(widget.layout(), QVBoxLayout):
-                    widget.setMaximumWidth(left_width)
-                    widget.setMinimumWidth(150)
-        
-        if hasattr(self, 'static_obstacles_page'):
-            self.static_obstacles_page.view.setFixedWidth(canvas_width)
-            for widget in self.static_obstacles_page.findChildren(QWidget):
-                if widget.layout() and isinstance(widget.layout(), QVBoxLayout):
-                    widget.setMaximumWidth(left_width)
-                    widget.setMinimumWidth(150)
-        
-        if hasattr(self, 'dynamic_obstacles_page'):
-            self.dynamic_obstacles_page.view.setFixedWidth(canvas_width)
-            for widget in self.dynamic_obstacles_page.findChildren(QWidget):
-                if widget.layout() and isinstance(widget.layout(), QVBoxLayout):
-                    widget.setMaximumWidth(left_width)
-                    widget.setMinimumWidth(150)
+        self._apply_responsive_layout()
+
+    # ── Canvas rendering ───────────────────────────────────────────────────
 
     def refresh_canvas(self, scene):
-        # Clear and redraw scene with grid and models
         scene.clear()
-        self.path_items.clear()
-        grid_spacing = 10
-        for x in range(-1000, 1000, grid_spacing):
-            scene.addLine(x, -1000, x, 1000, QPen(QColor("lightgray")))
-        for y in range(-1000, 1000, grid_spacing):
-            scene.addLine(-1000, y, 1000, y, QPen(QColor("lightgray")))
         self.wall_items.clear()
         self.obstacle_items.clear()
         self.path_items.clear()
-        if self.world_manager:
-            for model in self.world_manager.models:
-                if model.get("status") == "removed":
-                    continue
-                if model["type"] == "wall":
-                    # Draw wall as a line with label
-                    start = QPointF(model["properties"]["start"][0] * 100, -model["properties"]["start"][1] * 100)
-                    end = QPointF(model["properties"]["end"][0] * 100, -model["properties"]["end"][1] * 100)
-                    color_rgb = get_color(model["properties"]["color"])
-                    qcolor = QColor.fromRgbF(*color_rgb)
-                    thickness = max(int(model["properties"]["width"] * 100), 2)
-                    line = QGraphicsLineItem(QLineF(start, end))
-                    line.setPen(QPen(qcolor, thickness))
-                    scene.addItem(line)
-                    text = QGraphicsTextItem(model["name"])
-                    text.setPos((start + end) / 2)
-                    scene.addItem(text)
-                    self.wall_items[model["name"]] = (line, text)
-                elif model["type"] in ["box", "cylinder", "sphere"]:
-                    # Draw obstacle as rectangle or ellipse with label
-                    position = model["properties"]["position"]
-                    size = model["properties"]["size"]
-                    center = QPointF(position[0] * 100, -position[1] * 100)
-                    if model["type"] == "box":
-                        W, L, _ = size
-                        half_width_pixels = (W / 2) * 100
-                        half_length_pixels = (L / 2) * 100
-                        rounded_half_width_pixels = round(half_width_pixels / 10) * 10
-                        rounded_half_length_pixels = round(half_length_pixels / 10) * 10
-                        rect_pixels = QRectF(center.x() - rounded_half_width_pixels, center.y() - rounded_half_length_pixels,
-                                             2 * rounded_half_width_pixels, 2 * rounded_half_length_pixels)
-                        item = QGraphicsRectItem(rect_pixels)
-                    else:
-                        R = size[0]
-                        radius_pixels = R * 100
-                        rect_pixels = QRectF(center.x() - radius_pixels, center.y() - radius_pixels, 2 * radius_pixels, 2 * radius_pixels)
-                        item = QGraphicsEllipseItem(rect_pixels)
-                    item.setPen(QPen(Qt.black, 2))
-                    color_rgb = get_color(model["properties"]["color"])
-                    item.setBrush(QColor.fromRgbF(*color_rgb))
-                    scene.addItem(item)
-                    text = QGraphicsTextItem(model["name"])
-                    text.setPos(center)
-                    scene.addItem(text)
-                    self.obstacle_items[model["name"]] = (item, text)
-                motion = model["properties"].get("motion")
-                if motion:
-                    # Draw motion paths (linear, elliptical, or polygon)
-                    type_ = motion["type"]
-                    color = {"linear": "red", "elliptical": "green", "polygon": "blue"}[type_]
-                    items = []
-                    if type_ == "linear":
-                        p1 = QPointF(motion["path"][0][0] * 100, -motion["path"][0][1] * 100)
-                        p2 = QPointF(motion["path"][1][0] * 100, -motion["path"][1][1] * 100)
-                        line = QGraphicsLineItem(QLineF(p1, p2))
-                        line.setPen(QPen(QColor(color), 2))
-                        scene.addItem(line)
-                        items.append(line)
-                    elif type_ == "elliptical":
-                        center_m = model["properties"]["position"][:2]
-                        center = QPointF(center_m[0] * 100, -center_m[1] * 100)
-                        semi_major = motion["semi_major"]
-                        semi_minor = motion["semi_minor"]
-                        angle = motion["angle"]
-                        ellipse = QGraphicsEllipseItem(QRectF(-semi_major * 100, -semi_minor * 100, 2 * semi_major * 100, 2 * semi_minor * 100))
-                        ellipse.setPos(center)
-                        ellipse.setRotation(-math.degrees(angle))
-                        ellipse.setPen(QPen(QColor(color), 2))
-                        scene.addItem(ellipse)
-                        items.append(ellipse)
-                    elif type_ == "polygon":
-                        points = [QPointF(p[0] * 100, -p[1] * 100) for p in motion["path"]]
-                        for i in range(len(points)):
-                            line = QGraphicsLineItem(QLineF(points[i], points[(i + 1) % len(points)]))
-                            line.setPen(QPen(QColor(color), 2))
-                            scene.addItem(line)
-                            items.append(line)
-                    self.path_items[model["name"]] = items
+
+        grid_spacing = 10
+        grid_pen = QPen(QColor("#B0B0B0"), 0.5)
+        for x in range(-2500, 2501, grid_spacing):
+            scene.addLine(x, -2500, x, 2500, grid_pen)
+        for y in range(-2500, 2501, grid_spacing):
+            scene.addLine(-2500, y, 2500, y, grid_pen)
+
+        if not self.world_manager:
+            return
+
+        for model in self.world_manager.models:
+            if model.get("status") == "removed":
+                continue
+            mtype = model["type"]
+            props = model["properties"]
+
+            if mtype == "wall":
+                start = QPointF(props["start"][0] * 100, -props["start"][1] * 100)
+                end   = QPointF(props["end"][0]   * 100, -props["end"][1]   * 100)
+                color_rgb = get_color(props["color"])
+                thickness = max(int(props["width"] * 100), 2)
+                line = QGraphicsLineItem(QLineF(start, end))
+                line.setPen(QPen(QColor.fromRgbF(*color_rgb), thickness))
+                scene.addItem(line)
+                text = QGraphicsTextItem(model["name"])
+                text.setDefaultTextColor(QColor("#2C3E50"))
+                text.setFont(QFont("Arial", 7))
+                text.setPos((start + end) / 2)
+                scene.addItem(text)
+                self.wall_items[model["name"]] = (line, text)
+
+            elif mtype in ("box", "cylinder", "sphere"):
+                position = props["position"]
+                size = props["size"]
+                center = QPointF(position[0] * 100, -position[1] * 100)
+                if mtype == "box":
+                    W, L, _ = size
+                    hw = round((W / 2) * 100 / 10) * 10
+                    hl = round((L / 2) * 100 / 10) * 10
+                    item = QGraphicsRectItem(QRectF(center.x() - hw, center.y() - hl, 2*hw, 2*hl))
+                else:
+                    R = size[0] * 100
+                    item = QGraphicsEllipseItem(QRectF(center.x() - R, center.y() - R, 2*R, 2*R))
+                item.setPen(QPen(QColor("#2C3E50"), 1.5))
+                item.setBrush(QColor.fromRgbF(*get_color(props["color"])))
+                scene.addItem(item)
+                text = QGraphicsTextItem(model["name"])
+                text.setDefaultTextColor(QColor("#2C3E50"))
+                text.setFont(QFont("Arial", 7))
+                text.setPos(center)
+                scene.addItem(text)
+                self.obstacle_items[model["name"]] = (item, text)
+
+            motion = props.get("motion")
+            if motion:
+                type_ = motion["type"]
+                color = {"linear": "#E74C3C", "elliptical": "#27AE60", "polygon": "#4A90E2"}[type_]
+                items = []
+                if type_ == "linear":
+                    p1 = QPointF(motion["path"][0][0]*100, -motion["path"][0][1]*100)
+                    p2 = QPointF(motion["path"][1][0]*100, -motion["path"][1][1]*100)
+                    ln = QGraphicsLineItem(QLineF(p1, p2))
+                    ln.setPen(QPen(QColor(color), 2))
+                    scene.addItem(ln)
+                    items.append(ln)
+                elif type_ == "elliptical":
+                    cx, cy = props["position"][:2]
+                    c = QPointF(cx*100, -cy*100)
+                    sm, sn, ang = motion["semi_major"], motion["semi_minor"], motion["angle"]
+                    ell = QGraphicsEllipseItem(QRectF(-sm*100, -sn*100, 2*sm*100, 2*sn*100))
+                    ell.setPos(c)
+                    ell.setRotation(-math.degrees(ang))
+                    ell.setPen(QPen(QColor(color), 2))
+                    scene.addItem(ell)
+                    items.append(ell)
+                elif type_ == "polygon":
+                    pts = [QPointF(p[0]*100, -p[1]*100) for p in motion["path"]]
+                    for i in range(len(pts)):
+                        ln = QGraphicsLineItem(QLineF(pts[i], pts[(i+1) % len(pts)]))
+                        ln.setPen(QPen(QColor(color), 2))
+                        scene.addItem(ln)
+                        items.append(ln)
+                self.path_items[model["name"]] = items
+
+    # ── Window close ───────────────────────────────────────────────────────
 
     def closeEvent(self, event):
-        # Clean up world manager on window close
         if self.world_manager:
             self.world_manager.cleanup()
         event.accept()
 
+    # ── Helpers ────────────────────────────────────────────────────────────
+
     def initialize_world_manager(self, sim_type, version):
-        # Initialize world manager for selected simulation
-        if sim_type == "gazebo" and version in ["fortress", "harmonic"]:
+        if sim_type == "gazebo" and version in ("fortress", "harmonic", "ionic"):
             self.world_manager = WorldManager(sim_type, version)
         else:
             self.world_manager = None
 
     def update_navigation(self, page_id):
-        # Sync navigation list with current wizard page
-        if page_id != -1:
-            page_index = self.pageIds().index(page_id)
-            if self.nav_list.currentRow() != page_index:
-                self.nav_list.setCurrentRow(page_index)
+        if page_id == -1:
+            return
+        idx = self.pageIds().index(page_id)
+        if self.nav_list.currentRow() != idx:
+            self.nav_list.setCurrentRow(idx)
 
     def navigate_to_page(self, item):
-        # Navigate to selected page if prerequisites are met
-        page_names = ["Welcome", "Select Simulation", "Design Walls", "Add Static Obstacles",
-                      "Add Dynamic Obstacles", "Coming Soon"]
-        target_index = page_names.index(item.text())
-        current_index = self.pageIds().index(self.currentId())
-
-        while current_index < target_index:
+        target = _NAV_LABELS.index(item.text())
+        current = self.pageIds().index(self.currentId())
+        while current < target:
             if self.currentPage().isComplete():
                 self.next()
-                current_index += 1
+                current += 1
             else:
                 break
-        while current_index > target_index:
+        while current > target:
             self.back()
-            current_index -= 1
+            current -= 1

@@ -1,93 +1,123 @@
-# Dynamic World Generator Wizard (V1)
+# Dynamic World Generator Wizard (V2)
 
-![Dynamic World Generator Wizard Banner](https://github.com/user-attachments/assets/1b00aa22-24d7-40f1-8526-a3612bd7f503)
+![Dynamic World Generator Wizard Banner](https://github.com/user-attachments/assets/db8eade3-d841-48b7-86bc-3f99ee8737c4)
 
-**Dynamic World Generator Wizard** is a *PyQt5*-based graphical user interface (*GUI*) application designed to create and manage dynamic simulation worlds for *Gazebo* (*Harmonic* or *Fortress* versions). It allows users to build custom worlds with walls, static obstacles (boxes, cylinders, spheres), and dynamic obstacles with various motion paths (linear, elliptical, polygon). The tool generates *SDF* (*Simulation Description Format*) files for *Gazebo* and includes a motion script to animate dynamic obstacles. This app is ideal for robotics simulation, testing autonomous systems, or educational purposes in simulation environments.
+**Dynamic World Generator Wizard** is a *PyQt5*-based graphical wizard application for building and managing dynamic simulation worlds. V2 adds full **Gazebo Ionic** support, a **Map Generation** step that exports a *ROS 2*-compatible occupancy grid map (`.pgm` + `.yaml`) directly from the designed world, and a fully responsive UI that adapts to any window size.
 
-The wizard guides users through a step-by-step process, ensuring an intuitive experience. It supports creating new worlds from empty templates, loading existing ones, and applying changes in real-time to *Gazebo*.
+The wizard supports *Gazebo Ionic*, *Harmonic*, and *Fortress*. It guides users through a step-by-step process: select a simulator, design walls, place static and dynamic obstacles, generate an occupancy map, and apply everything to a live *Gazebo* session — all from one window.
 
 🙏 A special thanks to **Professor Sousso KELOUWANI** for his excellent idea that inspired the creation of this application.
 
+## What's New in V2
+
+* **Gazebo Ionic Support**: Full support for *Gazebo Ionic* alongside *Harmonic* and *Fortress*, including the correct *SDF 1.12* world template, `gz-transport14` / `gz-msgs11` Python bindings for dynamic obstacles, and dedicated world and map output directories.
+* **Map Generation**: Export a *ROS 2*-ready occupancy grid (`.pgm` + `.yaml`) from the finished world, with configurable resolution, origin, thresholds, and mode.
+* **Fully Responsive UI**: Sidebar, cards, buttons, and input labels all adapt as the window resizes — no truncation or overlap at any size.
+* **Improved Navigation**: Centered, word-wrapped nav labels with a wider sidebar and larger font for readability.
+* **Root Launcher**: Run the app with `./dwg_wizard` from the repo root — no need to `cd code/` manually.
+
 ## Key Features
 
-* **Simulation Selection**: Choose *Gazebo Harmonic* (recommended) or *Fortress*. *Isaac Sim* support is under development.
-* **Wall Design**: Draw walls on a canvas with customizable width, height, and color.
-* **Static Obstacles**: Add boxes, cylinders, or spheres with dimensions and colors.
-* **Dynamic Obstacles**: Assign motion paths (linear, elliptical, polygon) with velocity and randomness (*std*).
-* **Preview and Apply**: Real-time canvas preview and apply changes to *Gazebo* simulation.
-* **Coming Soon**: Teasers for future features like *Gazebo Ionic* and *Isaac Sim 4.5.0/5.0.0*.
+* **Simulation Selection**: Choose *Gazebo Ionic*, *Harmonic* (recommended), or *Fortress*. *Isaac Sim* support is under development.
+* **Wall Design**: Draw walls on an interactive canvas with customizable width, height, and color.
+* **Static Obstacles**: Place boxes, cylinders, or spheres with per-type dimension controls.
+* **Dynamic Obstacles**: Assign linear, elliptical, or polygon motion paths with velocity and randomness (*std*).
+* **Map Generation**: Render an occupancy grid map from all static geometry, export as `.pgm` + `.yaml` ready for *ROS 2 Nav2*.
+* **Preview and Apply**: Real-time canvas preview; apply changes to *Gazebo* in one click.
+* **Coming Soon**: *Isaac Sim 4.5.0*, *5.0.0*, and *5.1.0* support.
 
 ## Code Structure
 
-The codebase is organized in a modular structure for maintainability, with classes separated by functionality. Here's the directory layout:
-
 ```
 Dynamic_World_Generator/
+├── dwg_wizard                         # Root launcher — run from repo root
 ├── code/
 │   ├── __init__.py
 │   ├── classes/
-│   │   ├── dynamic_world_wizard.py  # Main wizard class handling navigation and canvas
-│   │   ├── zoomable_graphics_view.py  # Custom graphics view for zooming and panning the canvas
-│   │   ├── world_manager.py  # Handles world creation, loading, model management, and SDF generation
-│   │   ├── pages/
-│   │   │   ├── welcome_page.py  # Welcome page with title and GIF
-│   │   │   ├── sim_selection_page.py  # Simulation platform selection page
-│   │   │   ├── walls_design_page.py  # Wall design page with canvas drawing
-│   │   │   ├── static_obstacles_page.py  # Static obstacles addition page
-│   │   │   ├── dynamic_obstacles_page.py  # Dynamic obstacles and motion paths page
-│   │   │   └── coming_soon_page.py  # Coming soon features page
+│   │   ├── dynamic_world_wizard.py    # Main wizard: navigation sidebar, canvas sharing, stylesheet
+│   │   ├── zoomable_graphics_view.py  # Canvas with mouse-wheel zoom, middle-button pan, scale label
+│   │   ├── world_manager.py           # World creation, loading, model management, SDF generation
+│   │   ├── apply_worker.py            # Background thread for applying changes to Gazebo
+│   │   ├── responsive_widgets.py      # WrapButton (text wraps when narrow), ButtonRow (stacks when narrow)
+│   │   └── pages/
+│   │       ├── welcome_page.py        # Welcome page with responsive animated GIF and title
+│   │       ├── sim_selection_page.py  # Simulation platform selection with responsive image cards
+│   │       ├── walls_design_page.py   # Wall design page with canvas drawing
+│   │       ├── static_obstacles_page.py   # Static obstacle placement
+│   │       ├── dynamic_obstacles_page.py  # Dynamic obstacle motion paths
+│   │       ├── map_generation_page.py     # Occupancy map generation and export
+│   │       └── coming_soon_page.py        # Future features teaser
 │   ├── utils/
-│   │   ├── config.py  # Directory constants for images and worlds
-│   │   └── color_utils.py  # Utility for color mapping
-│   └── dwg_wizard.py  # Entry point to run the application
+│   │   ├── config.py                  # Directory constants (images, worlds, maps)
+│   │   └── color_utils.py             # Color-name to RGB mapping
+│   └── dwg_wizard.py                  # Entry point
 ├── images/
-│   ├── intro/
+│   ├── intro/                         # Images shown on the simulation selection page
+│   │   ├── welcome.gif
+│   │   ├── ionic.png
 │   │   ├── harmonic.png
-│   │   ├── fortress.jpeg
-│   │   └── isaacsim_450_gray.png
-│   └── future/
-│       ├── ionic.png
+│   │   └── fortress.jpeg
+│   └── future/                        # Images shown on the Coming Soon page
 │       ├── isaacsim_450.png
-│       └── isaacsim_500.png
+│       ├── isaacsim_500.png
+│       └── isaacsim_510.png
 ├── worlds/
-│   └── gazebo/
-│       ├── harmonic/
-│       │   ├── move_code # Motion scripts to animate dynamic obstacles (separate .py file + bash launcher file)
-│       │   └── empty_world.sdf
-│       └── fortress/
-│           ├── move_code # Motion scripts to animate dynamic obstacles (separate .py file + bash launcher file)
-│           └── empty_world.sdf
+│   ├── gazebo/
+│   │   ├── ionic/
+│   │   │   ├── empty_world.sdf        # Template (SDF 1.12, tracked); generated worlds are git-ignored
+│   │   │   └── move_code/             # Generated launch + motion scripts (git-ignored)
+│   │   ├── harmonic/
+│   │   │   ├── empty_world.sdf        # Template (SDF 1.9, tracked)
+│   │   │   └── move_code/
+│   │   └── fortress/
+│   │       ├── empty_world.sdf        # Template (SDF 1.8, tracked)
+│   │       └── move_code/
+│   └── isaacsim/
+│       ├── 450/
+│       ├── 500/
+│       └── 510/
+├── maps/
+│   ├── gazebo/
+│   │   ├── ionic/                     # Generated maps land here (git-ignored)
+│   │   ├── harmonic/
+│   │   └── fortress/
+│   └── isaacsim/
+│       ├── 450/
+│       ├── 500/
+│       └── 510/
 └── README.md
 ```
 
-* **`code/classes/`**: Contains core classes, including the wizard and page-specific logic.
-* **`code/classes/pages/`**: Individual wizard pages for modular *UI* components.
-* **`code/utils/`**: Shared utilities like path constants and color functions.
-* **`code/dwg_wizard.py`**: The main script to launch the wizard.
-* **`images/`**: Stores images for *UI* (intro and future features).
-* **`worlds/`**: Stores *Gazebo* world files and generated motion scripts.
+> **Note**: Generated world `.sdf` files, launch scripts (`*_launch.sh`), motion scripts (`*_moveObstacles.py`), and map outputs (`.pgm`, `.yaml`) are all listed in `.gitignore`. Only the `empty_world.sdf` templates are tracked.
 
 ## Installation and Usage
 
 ### Prerequisites
 
 * **Python**: *3.10+* (tested on *3.10*).
-* **Dependencies**: Install required libraries:
+* **Python Dependencies**:
   ```bash
   pip install PyQt5 lxml
   ```
-* **Gazebo**: Install *Gazebo Harmonic* (recommended) or *Fortress*:
-  * For *Harmonic* (*Ubuntu*/*Debian*), please visit:
-    [https://gazebosim.org/docs/harmonic/install_ubuntu/](https://gazebosim.org/docs/harmonic/install_ubuntu/)
+* **Gazebo**: Install your preferred version:
 
-  * For *Fortress*, please visit:
-    [https://gazebosim.org/docs/fortress/install_ubuntu/](https://gazebosim.org/docs/fortress/install_ubuntu/)
+  | Version | Install guide |
+  |---|---|
+  | *Ionic* | [gazebosim.org/docs/ionic/install_ubuntu](https://gazebosim.org/docs/ionic/install_ubuntu/) |
+  | *Harmonic* | [gazebosim.org/docs/harmonic/install_ubuntu](https://gazebosim.org/docs/harmonic/install_ubuntu/) |
+  | *Fortress* | [gazebosim.org/docs/fortress/install_ubuntu](https://gazebosim.org/docs/fortress/install_ubuntu/) |
 
-  * For *Harmonic*, also install transport libraries:
+* **Python transport bindings** (required for dynamic obstacle motion scripts):
+
+  * *Ionic* — installed via apt (no pip wheel available):
+    ```bash
+    sudo apt install python3-gz-transport14 python3-gz-msgs11
+    ```
+  * *Harmonic* — available via pip:
     ```bash
     pip install gz-transport13 gz-msgs10
     ```
-* **Images and Worlds**: Ensure the `images/intro/`, `images/future/`, and `worlds/gazebo/{version}/empty_world.sdf` directories exist in the project root.
+  * *Fortress* — no Python bindings needed; motion scripts use subprocess-based service calls instead.
 
 ### Setup
 
@@ -97,136 +127,137 @@ Dynamic_World_Generator/
    cd Dynamic_World_Generator
    ```
 
-2. **Run the Application**:
-   Run the main file from the `code/` directory:
+2. **Run the Application** (from the repo root):
+   ```bash
+   ./dwg_wizard
+   ```
+   Or, from the `code/` directory directly:
    ```bash
    cd code
    python3 dwg_wizard.py
    ```
 
-### Troubleshooting Installation
+### Troubleshooting
 
-* **PyQt5 Errors**: Ensure a display server is running (e.g., on *WSL*, use `export DISPLAY=:0` or install an *X server* like *Xming*).
-* **Gazebo Not Found**: Verify installation:
+* **PyQt5 Errors**: Make sure a display server is running. On *WSL*, set `export DISPLAY=:0` or use an *X server* like *Xming*.
+* **Gazebo Not Found**:
   ```bash
-  gz sim --version  # For Harmonic
-  ign gazebo --version  # For Fortress
+  gz sim --version      # Ionic or Harmonic
+  ign gazebo --version  # Fortress
   ```
-* **Missing SDF Files**: Ensure `empty_world.sdf` exists in `worlds/gazebo/{version}/`.
-* **Path Issues**: If images or worlds are not found, verify paths in `code/utils/config.py`. Update `PROJECT_ROOT` if the project is moved.
-* **Transport Errors (Harmonic)**: Ensure `gz-transport13` and `gz-msgs10` are installed for dynamic obstacle motion scripts.
+* **Missing SDF Template**: `empty_world.sdf` must exist in `worlds/gazebo/{version}/`.
+* **Path Issues**: If images or worlds are not found, check `code/utils/config.py`. Update `PROJECT_ROOT` if the repo was moved.
+* **Transport Errors (Ionic)**: Ensure `python3-gz-transport14` and `python3-gz-msgs11` are installed via apt — pip wheels are not available for Ionic bindings.
+* **Transport Errors (Harmonic)**: Ensure `gz-transport13` and `gz-msgs10` are installed — they are required to animate dynamic obstacles.
 
-## Tutorial: Creating a Complete Dynamic World
+## Tutorial: Building a Complete Dynamic World
 
-The wizard guides you through a step-by-step process to build a dynamic world. Below is a detailed tutorial covering all options and features.
+The wizard walks you through every step sequentially. Each page can be revisited using the left-hand navigation sidebar.
 
-### Step 1: Welcome Page
+### Step 1: Welcome
 
-<img width="1857" height="1048" alt="Welcome Page" src="https://github.com/user-attachments/assets/7bbd4df6-e7d6-4bad-8743-cbef0037cfc5" />
+An animated overview of the application. Click *Next* to begin.
 
-### Step 2: Select Simulation Platform
+<img width="1857" height="1048" alt="Welcome Page" src="https://github.com/user-attachments/assets/9ab5ce2f-359f-44f3-8d07-f2c0c172e144" />
 
-* **Choose Simulation**:
-  * **Gazebo Harmonic (Recommended)**: Select for the latest features. Recommended for the best outcome and results.
-  * **Gazebo Fortress**: Not suitable for dynamic motions (since uses *subprocess* instead of *python bindings*). You could use it mainly for building a static world.
-  * **Isaac Sim**: Under development, currently disabled.
-  * Click *Next* when done.
+### Step 2: Select Simulation
 
-<img width="1857" height="1048" alt="Simulation Selection" src="https://github.com/user-attachments/assets/7d7aa432-506c-49c9-9ad2-50e3b1d29ad7" />
+Three platforms are available, in this order:
+
+* **Gazebo Ionic**: Latest *Gazebo* release. Full dynamic obstacle support via `gz-transport14` / `gz-msgs11` Python bindings. Uses *SDF 1.12*.
+* **Gazebo Harmonic** *(Recommended)*: Stable, widely adopted release. Full dynamic obstacle support via `gz-transport13` / `gz-msgs10`. Uses *SDF 1.9*.
+* **Gazebo Fortress**: Suitable primarily for static worlds. Dynamic motion falls back to subprocess-based service calls instead of Python bindings. Uses *SDF 1.8*.
+
+Click the *Select* button on your chosen card, then click *Next*.
+
+<img width="1857" height="1048" alt="Simulation Selection" src="https://github.com/user-attachments/assets/4b79cdf5-74ce-45dc-812d-f28a4ce7e9b9" />
 
 ### Step 3: Design Walls
 
-* **Create or Load World**:
-  * Enter a world name (e.g., `myWorld`) in the text field.
-  * Click *Create New World* to copy `empty_world.sdf` or *Load World* to open an existing *SDF* file.
-* **Add Walls**:
-  * Set width (*m*, e.g., *0.2*), height (*m*, e.g., *1.5*), and color (*Black*, *Gray*, *White*, *Red*, *Blue*, *Green*).
-  * Click on the canvas twice to draw a wall (start and end points).
-  * Walls appear as lines on the canvas.
-* **Remove Walls**: Select a wall from the list and click *Remove Selected Wall*.
-* **Apply Changes**: Click *Apply and Preview* to update the *Gazebo* simulation and save to the *SDF* file (`worlds/gazebo/{version}/myWorld.sdf`).
-* **Canvas Controls**: Zoom with the mouse wheel, pan with the middle mouse button.
-* Click *Next* when done.
+* **Create or Load World**: Enter a world name (letters, numbers, underscores only) and click *Create New* or *Load*.
+* **Draw Walls**: Set width (*m*), height (*m*), and color, then click twice on the canvas to place a wall (start → end point). Each wall appears as a line on the canvas.
+* **Remove / Undo**: Select a wall from the list and click *Remove Selected* to delete it; click *Undo* to bring back the most recently removed wall — click repeatedly to step back through multiple removals, in list and on canvas alike.
+* **Apply**: *Apply and Preview* saves to the *SDF* file and pushes to the live *Gazebo* session.
+* **Canvas Controls**: Scroll wheel to zoom, middle mouse button to pan.
 
-<img width="1857" height="1048" alt="Walls Design" src="https://github.com/user-attachments/assets/522a2955-2ce6-49a9-a17e-8fd4d751ad32" />
+<img width="1857" height="1048" alt="Walls Design" src="https://github.com/user-attachments/assets/1ccd6f92-d824-4de4-8e70-e5c75bd251fa" />
 
-### Step 4: Add Static Obstacles
+### Step 4: Static Obstacles
 
-* **Select Obstacle Type**:
-  * **Box**: Set width, length, height (*m*).
-  * **Cylinder**: Set radius, height (*m*).
-  * **Sphere**: Set radius (*m*).
-* **Customize**:
-  * Choose color (*Black*, *Gray*, *White*, *Red*, *Blue*, *Green*).
-  * Enter dimensions (e.g., box: *1x1x1*; cylinder: radius=*0.5*, height=*1*).
-* **Add Obstacles**: Click on the canvas to place the obstacle at the desired position.
-* **Remove Obstacles**: Select from the list and click *Remove Selected Obstacle*.
-* **Apply Changes**: Click *Apply and Preview* to update *Gazebo* and *SDF*.
-* **Canvas Controls**: Zoom/pan as before.
-* Click *Next* when done.
+* **Types**: Box (width × length × height), Cylinder (radius × height), Sphere (radius).
+* **Placement**: Set dimensions and color, then click the canvas to drop the obstacle at that position.
+* **Remove / Undo**: Select an obstacle from the list and click *Remove Selected* to delete it; click *Undo* to bring back the most recently removed obstacle — click repeatedly to step back through multiple removals, in list and on canvas alike.
+* **Apply**: *Apply and Preview* updates the *SDF* and *Gazebo*.
 
-<img width="1857" height="1048" alt="Static Obstacles" src="https://github.com/user-attachments/assets/2f1c0359-c13b-42ad-8213-d121789d3b4f" />
+<img width="1857" height="1048" alt="Static Obstacles" src="https://github.com/user-attachments/assets/ba77c7e7-3d8a-4236-9d48-de91fa62271b" />
 
-### Step 5: Add Dynamic Obstacles
+### Step 5: Dynamic Obstacles
 
-* **Select Obstacle**: Choose a static obstacle from the list (populated from Step 4).
-* **Choose Motion Type**:
-  * **Linear**: Define a path with *2* points (red line).
-  * **Elliptical**: Define a point to act as a guider. The direction of the semi-major axis of the ellipse will be along the line connecting the defined point and the center of the obstacle (green ellipse).
-  * **Polygon**: Define multiple points, close with *Finish Path* (blue lines).
-* **Customize Motion**:
-  * Set velocity (*m/s*, e.g., *5.0*) and *std* (randomness, e.g., *0.1*).
-  * For elliptical, set semi-major (e.g., *2.0*) and semi-minor (e.g., *1.0*) axes.
-* **Define Path**:
-  * Click *Start Defining Path*.
-  * Click on the canvas to add points:
-    * Linear: *2* clicks.
-    * Elliptical: *1* click (defines orientation).
-    * Polygon: Multiple clicks, then *Finish Path* to close.
-  * Path appears on the canvas for preview.
-* **Apply Changes**: Click *Apply and Preview* to update the *SDF* and generate a motion script (`worlds/gazebo/{version}/move_code/myWorld_moveObstacles.py`) that animates obstacles in *Gazebo*.
-* **Canvas Controls**: Zoom/pan as before.
-* Click *Next* when done.
+* **Select Obstacle**: Pick any static obstacle from the list.
+* **Motion Type**:
+  * **Linear**: Click 2 points → red path line.
+  * **Elliptical**: Click 1 point to set the semi-major axis direction → green ellipse preview. Set semi-major and semi-minor axes before clicking.
+  * **Polygon**: Click multiple points, then *Finish Path* to close → blue path.
+* **Parameters**: Set velocity (*m/s*) and std (randomness).
+* **Workflow**: Click *Start Path*, click the canvas to define points, click *Finish Path* (polygon only).
+* **Apply**: *Apply and Preview* updates the *SDF* and generates:
+  * `worlds/gazebo/{version}/move_code/{world}_moveObstacles.py` — motion script
+  * `worlds/gazebo/{version}/move_code/{world}_launch.sh` — launcher for that script
 
-<img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/b287e0b4-e7d1-41d3-8f04-daedb002bf95" />
+<img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/3169328f-2664-4b7b-989b-8696799237c6" />
 
-### Step 6: Coming Soon Page
+### Step 6: Map Generation
 
-* Displays teasers for future features:
-  * **Gazebo Ionic**: Upcoming *Gazebo* version.
-  * **Isaac Sim 4.5.0/5.0.0**: Future simulator support.
-* Click *Finish* to exit the wizard.
+This step renders all static geometry (walls, boxes, cylinders, spheres) into a *ROS 2*-compatible occupancy grid map.
 
-<img width="1857" height="1048" alt="Coming Soon" src="https://github.com/user-attachments/assets/56a646ee-42cc-4d98-b168-8dd1ad0e1214" />
+* **Map Name**: Enter a name (e.g., `my_map`); the image file is named automatically.
+* **Map Settings (YAML)**:
+  * **Mode**: `trinary` (default), `scale`, or `raw`.
+  * **Resolution**: Meters per pixel (e.g., `0.05`).
+  * **Origin X / Y**: Bottom-left corner of the map in world coordinates — auto-computed from geometry with 2 m padding.
+  * **Negate**, **Occupied threshold**, **Free threshold**: Standard *ROS 2* nav-stack parameters.
+* **Live Preview**: The map preview updates automatically as settings change.
+* **Generate Map**: Exports to `maps/gazebo/{version}/{map_name}/`:
+  * `{map_name}.pgm` — grayscale occupancy image (P5 binary PGM)
+  * `{map_name}.yaml` — *ROS 2* map metadata file
+
+<img width="1857" height="1048" alt="Dynamic Obstacles" src="https://github.com/user-attachments/assets/647b8e11-265d-4e1c-83e0-09fb986e2201" />
+
+### Step 7: Coming Soon
+
+Teasers for planned simulator support:
+
+* **Isaac Sim 4.5.0** *(In Progress)*
+* **Isaac Sim 5.0.0** *(Planned)*
+* **Isaac Sim 5.1.0** *(Planned)*
+
+Click *Finish* to close the wizard.
+
+<img width="1857" height="1048" alt="Coming Soon" src="https://github.com/user-attachments/assets/6f95d04d-4398-4778-8dca-beb63755aa04" />
 
 ## Future Visions
 
 **Dynamic World Generator Wizard** is a foundation for an open-source simulation world builder. Planned enhancements include:
 
-* **Isaac Sim Support**: Full integration with *Isaac Sim 4.5.0* and *5.0.0* for advanced simulations.
+* **Isaac Sim Support**: Full integration with *Isaac Sim 4.5.0*, *5.0.0*, and *5.1.0*.
 * **Additional Motion Types**: Sinusoidal, random walk, or spline-based paths.
-* **Export Options**: Support for *ROS2*, *Unity*, or other simulators.
-* **UI Enhancements**: Undo/redo, *3D* preview, and drag-and-drop placement.
-* **Performance Optimizations**: Faster *SDF* generation and real-time updates.
-* **And definitely a lot more!!!**
+* **Export Options**: Direct *ROS 2* package export, *Unity*, or other simulator formats.
+* **UI Enhancements**: Redo, 3D preview, drag-and-drop obstacle placement.
+* **And definitely a lot more!**
 
-I’d **love collaborations**! Contribute via pull requests on *GitHub* for bug fixes, new features, or documentation improvements. Reach out via *GitHub Issues* for questions, suggestions, or partnership ideas.
+I'd **love collaborations**! Contribute via pull requests on *GitHub* for bug fixes, new features, or documentation improvements. Open a *GitHub Issue* for questions, suggestions, or partnership ideas.
 
 ## Contributing
 
-Contributions are welcome! To contribute:
-
 1. Fork the repository.
-2. Create a branch (`git checkout -b feature/your-feature`).
-3. Commit changes (`git commit -m "Add your feature"`).
-4. Push to the branch (`git push origin feature/your-feature`).
+2. Create a branch: `git checkout -b feature/your-feature`
+3. Commit changes: `git commit -m "Add your feature"`
+4. Push: `git push origin feature/your-feature`
 5. Open a pull request.
 
-Please include tests and documentation updates. For major changes, discuss in a *GitHub Issue* first.
+Please include documentation updates. For major changes, open a *GitHub Issue* first to discuss the approach.
 
 ---
 
-+ If you have any questions, please let me know: **a.pahlevani1998@gmail.com**
-
-+ Also, don't forget to check out our **website** at: **https://www.SLAMbotics.org**
-
++ Questions? Reach out: **a.pahlevani1998@gmail.com**
++ LinkedIn: **https://www.linkedin.com/in/ali-pahlevani/**

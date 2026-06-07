@@ -11,3 +11,6 @@ FUTURE_IMAGES_DIR = os.path.join(IMAGES_DIR, "future")
 # Directory for Gazebo worlds
 WORLDS_DIR = os.path.join(PROJECT_ROOT, "worlds")
 WORLDS_GAZEBO_DIR = os.path.join(WORLDS_DIR, "gazebo")
+
+# Directory for generated maps
+MAPS_DIR = os.path.join(PROJECT_ROOT, "maps")

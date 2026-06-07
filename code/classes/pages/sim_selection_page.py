@@ -1,20 +1,135 @@
-from PyQt5.QtWidgets import QWizardPage, QLineEdit, QHBoxLayout, QWidget, QVBoxLayout, QLabel, QPushButton, QFrame
+from PyQt5.QtWidgets import (
+    QWizardPage, QLineEdit, QHBoxLayout, QVBoxLayout, QWidget,
+    QLabel, QPushButton, QFrame, QSizePolicy,
+)
 from PyQt5.QtGui import QFont, QPixmap
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, QSize, pyqtSignal
 from utils.config import INTRO_IMAGES_DIR
 import os
+
+
+class _ScaledPixmapLabel(QLabel):
+    """QLabel that rescales its pixmap to fill available space on every resize."""
+    def __init__(self):
+        super().__init__()
+        self._source = None
+        self.setAlignment(Qt.AlignCenter)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumHeight(80)
+
+    def setSourcePixmap(self, pixmap):
+        self._source = pixmap
+        self._refresh()
+
+    def sizeHint(self):
+        return QSize(280, 260)
+
+    def minimumSizeHint(self):
+        return QSize(80, 100)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._refresh()
+
+    def _refresh(self):
+        if self._source and self.width() > 0 and self.height() > 0:
+            scaled = self._source.scaled(
+                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            super().setPixmap(scaled)
+
+_CARD_BASE = """
+    QWidget {{
+        background-color: {bg};
+        border-radius: 10px;
+        border: 2px solid {border};
+    }}
+"""
+
+_BUTTON_ACTIVE = """
+    QPushButton {
+        background-color: #4A90E2;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 11pt;
+        font-weight: bold;
+        padding: 10px 20px;
+        min-height: 40px;
+    }
+    QPushButton:hover { background-color: #3578C7; }
+"""
+
+_BUTTON_DISABLED = """
+    QPushButton {
+        background-color: #BDC3C7;
+        color: #ECEFF1;
+        border: none;
+        border-radius: 6px;
+        font-size: 11pt;
+        font-weight: bold;
+        padding: 10px 20px;
+        min-height: 40px;
+    }
+"""
+
+
+def _make_card(image_path, scale_w, scale_h, title_text, button_text,
+               enabled=True, badge=None):
+    """Return (card_widget, button)."""
+    card = QWidget()
+    card.setStyleSheet(
+        _CARD_BASE.format(bg="#FFFFFF", border="#D5D8DC")
+    )
+    card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    card.setMaximumHeight(440)
+    vbox = QVBoxLayout(card)
+    vbox.setContentsMargins(20, 16, 20, 16)
+    vbox.setSpacing(10)
+
+    img_label = _ScaledPixmapLabel()
+    if os.path.exists(image_path):
+        img_label.setSourcePixmap(QPixmap(image_path))
+    else:
+        img_label.setText("Image not found")
+        img_label.setStyleSheet("color: #95A5A6;")
+    vbox.addWidget(img_label, 1)  # stretch=1: image fills most of card
+
+    title = QLabel(title_text)
+    title.setAlignment(Qt.AlignCenter)
+    title.setStyleSheet(
+        "font-size: 15pt; font-weight: bold; color: #2C3E50; "
+        "background-color: transparent; border: none;"
+    )
+    vbox.addWidget(title)
+
+    if badge:
+        badge_label = QLabel(badge)
+        badge_label.setAlignment(Qt.AlignCenter)
+        badge_label.setStyleSheet(
+            "font-size: 11pt; color: #27AE60; "
+            "background-color: transparent; border: none;"
+        )
+        vbox.addWidget(badge_label)
+
+    btn = QPushButton(button_text)
+    btn.setEnabled(enabled)
+    btn.setStyleSheet(_BUTTON_ACTIVE if enabled else _BUTTON_DISABLED)
+    vbox.addWidget(btn)
+
+    return card, btn
+
 
 class SimSelectionPage(QWizardPage):
     simulationSelected = pyqtSignal(str, str)
 
     def __init__(self):
-        # Initialize wizard page with title and hidden fields
         super().__init__()
         self.setTitle("Select Simulation Platform")
         self._simulation = ""
         self._gazebo_version = ""
 
-        # Register hidden fields for simulation and version
+        # Hidden fields for wizard validation
         self.simulation_field = QLineEdit()
         self.simulation_field.setVisible(False)
         self.gazebo_version_field = QLineEdit()
@@ -22,152 +137,112 @@ class SimSelectionPage(QWizardPage):
         self.registerField("simulation*", self.simulation_field)
         self.registerField("gazebo_version", self.gazebo_version_field)
 
-        # Setup main layout with Gazebo and Isaac Sim sections
-        layout = QHBoxLayout()
+        # ── Page header ────────────────────────────────────────────
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(30, 20, 30, 20)
+        root_layout.setSpacing(16)
 
-        # Gazebo section with Harmonic and Fortress options
-        gazebo_widget = QWidget()
-        gazebo_layout = QVBoxLayout()
+        header = QLabel("Choose a simulation backend to continue")
+        header.setAlignment(Qt.AlignCenter)
+        header.setStyleSheet("font-size: 13pt; color: #7F8C8D;")
+        root_layout.addWidget(header)
 
-        # Harmonic option
-        harmonic_widget = QWidget()
-        harmonic_layout = QVBoxLayout()
-        harmonic_label = QLabel("Gazebo Harmonic (Recommended)")
-        harmonic_label.setAlignment(Qt.AlignCenter)
-        harmonic_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
-        harmonic_label.setStyleSheet("color: red;")
-        harmonic_image_label = QLabel()
-        harmonic_image_path = os.path.join(INTRO_IMAGES_DIR, "harmonic.png")
-        if os.path.exists(harmonic_image_path):
-            pixmap = QPixmap(harmonic_image_path).scaled(290, 290, Qt.KeepAspectRatio)
-            harmonic_image_label.setPixmap(pixmap)
-        else:
-            harmonic_image_label.setText("Harmonic image not found")
-        harmonic_image_label.setFixedSize(290, 290)
-        harmonic_image_label.setAlignment(Qt.AlignCenter)
-        self.harmonic_button = QPushButton("Select Harmonic")
-        self.harmonic_button.setFont(QFont("Arial", 14))
-        self.harmonic_button.setFixedHeight(50)
-        self.harmonic_button.clicked.connect(lambda: self.select_gazebo_version("harmonic"))
-        harmonic_layout.addWidget(harmonic_label)
-        harmonic_layout.addSpacing(10)
-        harmonic_layout.addWidget(harmonic_image_label, alignment=Qt.AlignCenter)
-        harmonic_layout.addSpacing(10)
-        harmonic_layout.addWidget(self.harmonic_button, alignment=Qt.AlignCenter)
-        harmonic_layout.addStretch(1)
-        harmonic_widget.setLayout(harmonic_layout)
-        gazebo_layout.addWidget(harmonic_widget)
+        # ── Cards row ──────────────────────────────────────────────
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(20)
 
-        # Horizontal separator
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        gazebo_layout.addWidget(separator)
-
-        # Fortress option
-        fortress_widget = QWidget()
-        fortress_layout = QVBoxLayout()
-        fortress_label = QLabel("Gazebo Fortress")
-        fortress_label.setAlignment(Qt.AlignCenter)
-        fortress_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
-        fortress_label.setStyleSheet("color: red;")
-        fortress_image_label = QLabel()
-        fortress_image_path = os.path.join(INTRO_IMAGES_DIR, "fortress.jpeg")
-        if os.path.exists(fortress_image_path):
-            pixmap = QPixmap(fortress_image_path).scaled(290, 290, Qt.KeepAspectRatio)
-            fortress_image_label.setPixmap(pixmap)
-        else:
-            fortress_image_label.setText("Fortress image not found")
-        fortress_image_label.setFixedSize(290, 290)
-        fortress_image_label.setAlignment(Qt.AlignCenter)
-        self.fortress_button = QPushButton("Select Fortress")
-        self.fortress_button.setFont(QFont("Arial", 14))
-        self.fortress_button.setFixedHeight(50)
-        self.fortress_button.clicked.connect(lambda: self.select_gazebo_version("fortress"))
-        fortress_layout.addWidget(fortress_label)
-        fortress_layout.addSpacing(10)
-        fortress_layout.addWidget(fortress_image_label, alignment=Qt.AlignCenter)
-        fortress_layout.addSpacing(10)
-        fortress_layout.addWidget(self.fortress_button, alignment=Qt.AlignCenter)
-        fortress_layout.addStretch(1)
-        fortress_widget.setLayout(fortress_layout)
-        gazebo_layout.addWidget(fortress_widget)
-
-        gazebo_layout.addStretch(1)
-        gazebo_widget.setLayout(gazebo_layout)
-        layout.addWidget(gazebo_widget, stretch=1)
+        # Ionic card
+        ionic_img = os.path.join(INTRO_IMAGES_DIR, "ionic.png")
+        ionic_card, self.ionic_button = _make_card(
+            ionic_img, 220, 220,
+            "Gazebo Ionic",
+            "Select Ionic",
+            enabled=True,
+        )
+        self.ionic_button.clicked.connect(
+            lambda: self.select_gazebo_version("ionic"))
+        cards_row.addWidget(ionic_card)
 
         # Vertical divider
-        divider = QFrame()
-        divider.setFrameShape(QFrame.VLine)
-        divider.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(divider, stretch=0)
+        div = QFrame()
+        div.setFrameShape(QFrame.VLine)
+        div.setFrameShadow(QFrame.Sunken)
+        div.setStyleSheet("color: #D5D8DC;")
+        cards_row.addWidget(div)
 
-        # Isaac Sim section (disabled)
-        isaac_widget = QWidget()
-        isaac_layout = QVBoxLayout()
-        isaac_layout.addStretch(1)
-        isaac_label = QLabel("Isaac Sim (Under Development)")
-        isaac_label.setAlignment(Qt.AlignCenter)
-        isaac_label.setFont(QFont("Arial", 18, QFont.Bold | QFont.StyleItalic))
-        isaac_label.setStyleSheet("color: red;")
-        isaac_image_label = QLabel()
-        isaac_image_path = os.path.join(INTRO_IMAGES_DIR, "isaacsim_450_gray.png")
-        if os.path.exists(isaac_image_path):
-            pixmap = QPixmap(isaac_image_path).scaled(674, 1264, Qt.KeepAspectRatio)
-            isaac_image_label.setPixmap(pixmap)
-        else:
-            isaac_image_label.setText("Isaac Sim image not found")
-        isaac_image_label.setFixedSize(550, 400)
-        isaac_image_label.setAlignment(Qt.AlignCenter)
-        self.isaac_button = QPushButton("Select Isaac Sim")
-        self.isaac_button.setFont(QFont("Arial", 14))
-        self.isaac_button.setFixedHeight(50)
-        self.isaac_button.setEnabled(False)
-        isaac_layout.addWidget(isaac_label)
-        isaac_layout.addSpacing(10)
-        isaac_layout.addWidget(isaac_image_label, alignment=Qt.AlignCenter)
-        isaac_layout.addSpacing(10)
-        isaac_layout.addWidget(self.isaac_button, alignment=Qt.AlignCenter)
-        isaac_layout.addStretch(1)
-        isaac_widget.setLayout(isaac_layout)
-        layout.addWidget(isaac_widget, stretch=1)
+        # Harmonic card
+        harmonic_img = os.path.join(INTRO_IMAGES_DIR, "harmonic.png")
+        harmonic_card, self.harmonic_button = _make_card(
+            harmonic_img, 220, 220,
+            "Gazebo Harmonic",
+            "Select Harmonic",
+            enabled=True,
+            badge="★ Recommended",
+        )
+        self.harmonic_button.clicked.connect(
+            lambda: self.select_gazebo_version("harmonic"))
+        cards_row.addWidget(harmonic_card)
 
-        self.setLayout(layout)
+        # Vertical divider
+        div2 = QFrame()
+        div2.setFrameShape(QFrame.VLine)
+        div2.setFrameShadow(QFrame.Sunken)
+        div2.setStyleSheet("color: #D5D8DC;")
+        cards_row.addWidget(div2)
 
-        # Apply button stylesheets
-        button_style = """
-            QPushButton {
-                background-color: #4A90E2;
-                color: white;
-                padding: 15px;
-                font-size: 14pt;
-            }
-            QPushButton:hover {
-                background-color: #6AB0F3;
-                transform: scale(1.05);
-            }
-        """
-        self.fortress_button.setStyleSheet(button_style)
-        self.harmonic_button.setStyleSheet(button_style)
-        self.isaac_button.setStyleSheet("""
-            QPushButton {
-                background-color: #A9A9A9;
-                color: white;
-                padding: 15px;
-                font-size: 14pt;
-            }
-        """)
+        # Fortress card
+        fortress_img = os.path.join(INTRO_IMAGES_DIR, "fortress.jpeg")
+        fortress_card, self.fortress_button = _make_card(
+            fortress_img, 220, 220,
+            "Gazebo Fortress",
+            "Select Fortress",
+            enabled=True,
+        )
+        self.fortress_button.clicked.connect(
+            lambda: self.select_gazebo_version("fortress"))
+        cards_row.addWidget(fortress_card)
+
+        root_layout.addStretch(1)
+        root_layout.addLayout(cards_row)
+        root_layout.addStretch(1)
+
+        # Selection status label
+        self.status_label = QLabel("")
+        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setStyleSheet(
+            "font-size: 12pt; color: #27AE60; font-weight: bold;"
+        )
+        root_layout.addWidget(self.status_label)
+
+    # ── Card highlight helper ──────────────────────────────────────────────
+
+    def _highlight_card(self, selected_btn):
+        for btn in (self.ionic_button, self.harmonic_button, self.fortress_button):
+            is_selected = (btn is selected_btn)
+            parent = btn.parent()
+            parent.setStyleSheet(
+                _CARD_BASE.format(
+                    bg="#EBF3FB" if is_selected else "#FFFFFF",
+                    border="#4A90E2" if is_selected else "#D5D8DC",
+                )
+            )
+
+    # ── Selection ──────────────────────────────────────────────────────────
 
     def select_gazebo_version(self, version):
-        # Select Gazebo version and emit signal
         self._simulation = "gazebo"
         self._gazebo_version = version
         self.simulation_field.setText("gazebo")
         self.gazebo_version_field.setText(version)
         self.simulationSelected.emit("gazebo", version)
+        btn_map = {
+            "ionic": self.ionic_button,
+            "harmonic": self.harmonic_button,
+            "fortress": self.fortress_button,
+        }
+        self._highlight_card(btn_map[version])
+        self.status_label.setText(f"✔  Gazebo {version.capitalize()} selected")
         self.completeChanged.emit()
 
     def isComplete(self):
-        # Check if a valid simulation and version are selected
-        return self._simulation == "gazebo" and self._gazebo_version in ["fortress", "harmonic"]
+        return self._simulation == "gazebo" and self._gazebo_version in ("fortress", "harmonic", "ionic")

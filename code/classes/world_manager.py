@@ -1,4 +1,6 @@
 import os
+import re
+import signal
 import subprocess
 import time
 import math
@@ -6,12 +8,20 @@ from xml.etree import ElementTree as ET
 from utils.color_utils import get_color
 from utils.config import PROJECT_ROOT, WORLDS_GAZEBO_DIR
 
+_VALID_WORLD_NAME = re.compile(r'^[A-Za-z0-9_]+$')
+_NUMBERED_NAME_RE = re.compile(r'^(.+)_(\d+)$')
+
+
 class WorldManager:
     def __init__(self, simulation, version):
-        # Initialize world manager with simulation and version
         self.simulation = simulation
         self.version = version
-        self.sdf_version = "1.8" if version == "fortress" else "1.9"
+        if version == "fortress":
+            self.sdf_version = "1.8"
+        elif version == "ionic":
+            self.sdf_version = "1.12"
+        else:
+            self.sdf_version = "1.9"
         self.world_path = None
         self.world_name = None
         self.models = []
@@ -20,18 +30,16 @@ class WorldManager:
         self.process = None
         self.script_process = None
         self.base_dir = PROJECT_ROOT
+        self._gazebo_ready = False
+        self._process_start_time = 0.0
 
     def create_new_world(self, world_name):
-        # Create a new world from empty template
         self.world_name = world_name
         empty_world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, "empty_world.sdf")
         if not os.path.exists(empty_world_path):
             raise FileNotFoundError(f"Empty world file not found: {empty_world_path}")
 
-        if self.version == "fortress":
-            cmd = ["ign", "gazebo", empty_world_path]
-        else:
-            cmd = ["gz", "sim", empty_world_path]
+        cmd = ["ign", "gazebo", empty_world_path] if self.version == "fortress" else ["gz", "sim", empty_world_path]
         self.process = subprocess.Popen(cmd)
         self.world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, f"{world_name}.sdf")
         self.models = []
@@ -40,24 +48,21 @@ class WorldManager:
         self.world_name = self.sdf_root.find("world").get("name")
 
     def load_world(self, world_name):
-        # Load an existing world
         self.world_name = world_name
         self.world_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, f"{world_name}.sdf")
         if not os.path.exists(self.world_path):
             raise FileNotFoundError(f"World file not found: {self.world_path}")
 
-        if self.version == "fortress":
-            cmd = ["ign", "gazebo", self.world_path]
-        else:
-            cmd = ["gz", "sim", self.world_path]
+        cmd = ["ign", "gazebo", self.world_path] if self.version == "fortress" else ["gz", "sim", self.world_path]
         self.process = subprocess.Popen(cmd)
+        self._process_start_time = time.time()
+        self._gazebo_ready = False
 
         self.sdf_tree = ET.parse(self.world_path)
         self.sdf_root = self.sdf_tree.getroot()
         self.world_name = self.sdf_root.find("world").get("name")
         self.models = []
 
-        # Map RGB values to color names
         rgb_to_color = {
             (0, 0, 0): "Black",
             (0.5, 0.5, 0.5): "Gray",
@@ -67,7 +72,6 @@ class WorldManager:
             (0, 1, 0): "Green"
         }
 
-        # Parse models from SDF
         for model_elem in self.sdf_root.findall(".//model"):
             name = model_elem.get("name")
             type_elem = model_elem.find("type")
@@ -86,15 +90,16 @@ class WorldManager:
                         model_type = "unknown"
 
             properties = {}
-            pose_str = model_elem.find("pose").text
-            pose = [float(x) for x in pose_str.split()]
+            pose_elem = model_elem.find("pose")
+            if pose_elem is None or not pose_elem.text:
+                continue
+            pose = [float(v) for v in pose_elem.text.split()]
             x, y, z, _, _, yaw = pose
 
-            # Parse color from material
             material = model_elem.find(".//material/diffuse")
             color_name = "Gray"
             if material is not None:
-                rgb = tuple(float(x) for x in material.text.split()[:3])
+                rgb = tuple(float(v) for v in material.text.split()[:3])
                 color_name = rgb_to_color.get(rgb, "Gray")
 
             geometry = model_elem.find(".//geometry")
@@ -106,13 +111,9 @@ class WorldManager:
                         length, width, height = size
                         dx = (length / 2) * math.cos(yaw)
                         dy = (length / 2) * math.sin(yaw)
-                        start_x = x - dx
-                        start_y = y - dy
-                        end_x = x + dx
-                        end_y = y + dy
                         properties = {
-                            "start": (start_x, start_y),
-                            "end": (end_x, end_y),
+                            "start": (x - dx, y - dy),
+                            "end": (x + dx, y + dy),
                             "width": width,
                             "height": height,
                             "color": color_name
@@ -139,7 +140,6 @@ class WorldManager:
                         "color": color_name
                     }
 
-            # Parse motion for dynamic obstacles
             motion_elem = model_elem.find(".//motion")
             if motion_elem is not None:
                 motion = {"type": motion_elem.find("type").text}
@@ -152,9 +152,9 @@ class WorldManager:
                 if motion["type"] in ["linear", "polygon"]:
                     path = []
                     for point_elem in motion_elem.findall("point"):
-                        x = float(point_elem.find("x").text)
-                        y = float(point_elem.find("y").text)
-                        path.append((x, y))
+                        px = float(point_elem.find("x").text)
+                        py = float(point_elem.find("y").text)
+                        path.append((px, py))
                     motion["path"] = path
                 elif motion["type"] == "elliptical":
                     motion["semi_major"] = float(motion_elem.find("semi_major").text)
@@ -170,81 +170,215 @@ class WorldManager:
             })
 
     def add_model(self, model):
-        # Add or update a model in the world
         for existing_model in self.models:
             if existing_model["name"] == model["name"]:
+                reused_removed = existing_model["status"] == "removed"
                 existing_model.update(model)
+                if reused_removed:
+                    # The freed-up name belonged to a model that is still (or
+                    # was) live in Gazebo — delete that entity, then create
+                    # this one in its place, instead of overwriting "removed".
+                    existing_model["status"] = "updated"
                 return
         self.models.append(model)
 
-    def apply_changes(self):
-        # Apply model changes to the simulation and SDF
-        if not self.process or self.process.poll() is not None:
-            raise RuntimeError("Gazebo simulation is not running. Please create or load a world first.")
+    def _renumber_models(self):
+        """Close numbering gaps left by removed models, e.g. wall_1, wall_3
+        becomes wall_1, wall_2 (and similarly box_/cylinder_/sphere_, each
+        numbered independently) once Apply is pushed.
 
-        time.sleep(2)
+        Gazebo has no rename service, so a model that is already live there
+        can only be renamed by deleting the old-named entity and creating a
+        new-named one with the same properties; entries that were never
+        pushed (status "new") are simply renamed in place. All deletions are
+        applied before any creation so a freed-up name is never claimed
+        before its previous occupant is gone.
+        """
+        groups = {}
+        for m in self.models:
+            if m["status"] == "removed":
+                continue
+            match = _NUMBERED_NAME_RE.match(m["name"])
+            if match:
+                groups.setdefault(match.group(1), []).append((m, int(match.group(2))))
+
+        removals, creations = [], []
+        for prefix, members in groups.items():
+            members.sort(key=lambda pair: pair[1])
+            for idx, (m, _) in enumerate(members, start=1):
+                new_name = f"{prefix}_{idx}"
+                if m["name"] == new_name:
+                    continue
+                if m["status"] == "new":
+                    m["name"] = new_name
+                    continue
+                removals.append({
+                    "name": m["name"],
+                    "type": m["type"],
+                    "properties": dict(m["properties"]),
+                    "status": "removed",
+                })
+                m["name"] = new_name
+                m["status"] = "new"
+                creations.append(m)
+
+        if removals or creations:
+            creation_ids = {id(m) for m in creations}
+            remaining = [m for m in self.models if id(m) not in creation_ids]
+            self.models = remaining + removals + creations
+
+    def apply_changes(self):
+        """Push pending model changes to the running Gazebo simulation.
+
+        Returns a list of (model_name, error_message) tuples for every model
+        that failed to be applied.  An empty list means full success.
+        """
+        if not self.process or self.process.poll() is not None:
+            raise RuntimeError(
+                "Gazebo simulation is not running. "
+                "Please create or load a world first."
+            )
+
+        if not _VALID_WORLD_NAME.match(self.world_name or ""):
+            raise RuntimeError(
+                f"World name '{self.world_name}' is not a valid Gazebo service name.\n"
+                "World names may only contain letters, numbers, and underscores — "
+                "no spaces or special characters.\n"
+                f"Rename the world to: {re.sub(r'[^A-Za-z0-9_]', '_', self.world_name or 'my_world')}"
+            )
 
         prefix = "ign" if self.version == "fortress" else "gz"
+        print(f"[DWG] apply_changes — world='{self.world_name}' version={self.version}")
+        if not self._gazebo_ready:
+            # `gz service --list` is unreliable for discovery (multicast may
+            # never return the world service even when it is running).  A
+            # simple elapsed-time guard is more predictable: Gazebo needs ~4 s
+            # to register its transport services after startup.  If the user
+            # took longer than that to draw objects, no sleep is needed.
+            elapsed = time.time() - self._process_start_time
+            wait = max(0.0, 4.0 - elapsed)
+            if wait > 0.05:
+                print(f"[DWG] Waiting {wait:.1f}s for Gazebo services to register …")
+                time.sleep(wait)
+            self._gazebo_ready = True
         reqtype_prefix = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
+        SERVICE_TIMEOUT = "5000"
 
-        for model in self.models[:]:
+        # Stop any running motion script BEFORE touching entities.
+        # If the old script keeps sending set_pose calls during remove/create,
+        # Gazebo logs floods of "Unable to update pose for entity id:[0]".
+        if self.script_process and self.script_process.poll() is None:
+            self.script_process.terminate()
+            try:
+                self.script_process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.script_process.kill()
+                self.script_process.wait(timeout=2)
+            self.script_process = None
+
+        self._renumber_models()
+
+        errors = []          # (name, message)
+        applied_names = set()  # models successfully pushed to Gazebo
+
+        # Process every deletion (explicit removals AND the old-name half of
+        # a rename) before any creation/update. Renumbering can free up a
+        # name (e.g. old "box_3") that another entry is renamed *into* in the
+        # very same Apply — creating it first would leave two Gazebo entities
+        # briefly answering to the same name and desync our model dict from
+        # Gazebo's actual state (surfacing later as "Entity ... not found").
+        ordered_models = (
+            [m for m in self.models if m["status"] == "removed"] +
+            [m for m in self.models if m["status"] != "removed"]
+        )
+        for model in ordered_models:
+            name = model["name"]
+
+            # ── updated: delete existing, then re-create ─────────────────
             if model["status"] == "updated":
-                request_str = f'name: "{model["name"]}", type: 2'
-                cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
-                    "--reqtype", f"{reqtype_prefix}.Entity",
-                    "--reptype", f"{reqtype_prefix}.Boolean",
-                    "--timeout", "3000",
-                    "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
-                    continue
-                for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
-                    self.sdf_root.find("world").remove(elem)
-                self.save_sdf(self.world_path)
-                model["status"] = "new"
+                req = f'name: "{name}", type: 2'
+                cmd = [prefix, "service", "-s",
+                       f"/world/{self.world_name}/remove",
+                       "--reqtype", f"{reqtype_prefix}.Entity",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", SERVICE_TIMEOUT,
+                       "--req", req]
+                print(f"[DWG]   remove '{name}' …")
+                r = subprocess.run(cmd, capture_output=True, text=True)
+                print(f"[DWG]     rc={r.returncode}  stdout={r.stdout.strip()!r}"
+                      f"  stderr={r.stderr.strip()!r}")
+                if r.returncode == 0:
+                    for elem in self.sdf_root.findall(
+                            f".//model[@name='{name}']"):
+                        self.sdf_root.find("world").remove(elem)
+                    self.save_sdf(self.world_path)
+                model["status"] = "new"   # fall through to creation
 
+            # ── new: create ───────────────────────────────────────────────
             if model["status"] == "new":
-                sdf_snippet_service = self.generate_model_sdf(model, for_service=True)
-                sdf_escaped = sdf_snippet_service.replace('"', '\\"')
-                sdf_compact = ' '.join(sdf_escaped.split())
-                request_str = f'sdf: "{sdf_compact}"'
-                cmd = [prefix, "service", "-s", f"/world/{self.world_name}/create",
-                    "--reqtype", f"{reqtype_prefix}.EntityFactory",
-                    "--reptype", f"{reqtype_prefix}.Boolean",
-                    "--timeout", "3000",
-                    "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0 or "data: true" not in result.stdout:
+                sdf_service = self.generate_model_sdf(model, for_service=True)
+                sdf_escaped = sdf_service.replace('"', '\\"')
+                sdf_compact = " ".join(sdf_escaped.split())
+                req = f'sdf: "{sdf_compact}"'
+                cmd = [prefix, "service", "-s",
+                       f"/world/{self.world_name}/create",
+                       "--reqtype", f"{reqtype_prefix}.EntityFactory",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", SERVICE_TIMEOUT,
+                       "--req", req]
+                print(f"[DWG]   create '{name}' ({model['type']}) …")
+                r = subprocess.run(cmd, capture_output=True, text=True)
+                print(f"[DWG]     rc={r.returncode}  stdout={r.stdout.strip()!r}"
+                      f"  stderr={r.stderr.strip()!r}")
+                if r.returncode != 0 or "data: true" not in r.stdout:
+                    detail = (r.stderr.strip() or r.stdout.strip()
+                              or "no response from Gazebo service")
+                    errors.append((name, detail))
+                    # Keep status="new" so the user can retry
                     continue
-                time.sleep(1)
-                sdf_snippet_file = self.generate_model_sdf(model, for_service=False)
-                model_elem = ET.fromstring(sdf_snippet_file)
-                for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
+                time.sleep(0.5)
+                sdf_file = self.generate_model_sdf(model, for_service=False)
+                model_elem = ET.fromstring(sdf_file)
+                for elem in self.sdf_root.findall(f".//model[@name='{name}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.sdf_root.find("world").append(model_elem)
                 self.save_sdf(self.world_path)
+                applied_names.add(name)
+
+            # ── removed: delete ───────────────────────────────────────────
             elif model["status"] == "removed":
-                request_str = f'name: "{model["name"]}", type: 2'
-                cmd = [prefix, "service", "-s", f"/world/{self.world_name}/remove",
-                    "--reqtype", f"{reqtype_prefix}.Entity",
-                    "--reptype", f"{reqtype_prefix}.Boolean",
-                    "--timeout", "3000",
-                    "--req", request_str]
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode != 0:
+                req = f'name: "{name}", type: 2'
+                cmd = [prefix, "service", "-s",
+                       f"/world/{self.world_name}/remove",
+                       "--reqtype", f"{reqtype_prefix}.Entity",
+                       "--reptype", f"{reqtype_prefix}.Boolean",
+                       "--timeout", SERVICE_TIMEOUT,
+                       "--req", req]
+                print(f"[DWG]   delete '{name}' …")
+                r = subprocess.run(cmd, capture_output=True, text=True)
+                print(f"[DWG]     rc={r.returncode}  stdout={r.stdout.strip()!r}"
+                      f"  stderr={r.stderr.strip()!r}")
+                if r.returncode != 0:
+                    detail = r.stderr.strip() or r.stdout.strip() or "remove failed"
+                    errors.append((name, detail))
                     continue
-                for elem in self.sdf_root.findall(f".//model[@name='{model['name']}']"):
+                for elem in self.sdf_root.findall(f".//model[@name='{name}']"):
                     self.sdf_root.find("world").remove(elem)
                 self.save_sdf(self.world_path)
+                applied_names.add(name)
 
-        # Generate motion script for dynamic models
-        dynamic_models = [m for m in self.models if "motion" in m["properties"]]
+        dynamic_models = [m for m in self.models
+                          if m["status"] != "removed" and "motion" in m["properties"]]
         if dynamic_models:
             move_code_dir = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code")
             os.makedirs(move_code_dir, exist_ok=True)
             script_path = os.path.join(move_code_dir, f"{self.world_name}_moveObstacles.py")
             with open(script_path, 'w') as f:
                 f.write('#!/usr/bin/env python3\n')
+                # Must be set before any gz/protobuf import to work around
+                # protobuf >= 4.x C-extension incompatibility with older stubs.
+                f.write('import os\n')
+                f.write('os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"\n')
                 f.write('import time\n')
                 f.write('import random\n')
                 f.write('import math\n\n')
@@ -252,12 +386,18 @@ class WorldManager:
                     f.write('from gz.transport13 import Node\n')
                     f.write('from gz.msgs10.pose_pb2 import Pose\n')
                     f.write('from gz.msgs10.boolean_pb2 import Boolean\n\n')
+                elif self.version == "ionic":
+                    f.write('from gz.transport14 import Node\n')
+                    f.write('from gz.msgs11.pose_pb2 import Pose\n')
+                    f.write('from gz.msgs11.boolean_pb2 import Boolean\n\n')
                 else:
                     f.write('import subprocess\n\n')
-                f.write(f'prefix = "{"ign" if self.version == "fortress" else "gz"}\"\n')
-                f.write(f'reqtype_prefix = "{"ignition.msgs" if self.version == "fortress" else "gz.msgs"}\"\n')
+                prefix_val = "ign" if self.version == "fortress" else "gz"
+                reqtype_val = "ignition.msgs" if self.version == "fortress" else "gz.msgs"
+                f.write(f'prefix = "{prefix_val}"\n')
+                f.write(f'reqtype_prefix = "{reqtype_val}"\n')
                 f.write(f'world_name = "{self.world_name}"\n\n')
-                if self.version == "harmonic":
+                if self.version in ("harmonic", "ionic"):
                     f.write('node = Node()\n\n')
                     f.write('def set_pose(model_name, x, y, z):\n')
                     f.write('    req = Pose()\n')
@@ -350,12 +490,12 @@ class WorldManager:
                 f.write('                y = start[1] + state["t"] * dy\n')
                 f.write('                if not set_pose(model_name, x, y, state["z"]):\n')
                 f.write('                    exit(1)\n')
-                f.write('        time.sleep(linear_dt if motion["type"] == "linear" else dt)\n')
+                # Use linear_dt (smallest interval) so all motion types stay responsive
+                f.write('        time.sleep(linear_dt)\n')
                 f.write('    except KeyboardInterrupt:\n')
                 f.write('        exit(0)\n')
             os.chmod(script_path, 0o755)
 
-            # Generate launch script
             launch_path = os.path.join(WORLDS_GAZEBO_DIR, self.version, "move_code", f"{self.world_name}_launch.sh")
             with open(launch_path, 'w') as f:
                 f.write('#!/bin/bash\n')
@@ -368,29 +508,31 @@ class WorldManager:
                 f.write('wait\n')
             os.chmod(launch_path, 0o755)
 
-            # Manage motion script process
-            if self.script_process and self.script_process.poll() is None:
-                self.script_process.terminate()
-                try:
-                    self.script_process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    self.script_process.kill()
-            self.script_process = subprocess.Popen(['python3', script_path])
+            env = os.environ.copy()
+            env['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
+            self.script_process = subprocess.Popen(['python3', script_path], env=env)
 
-        self.models = [m for m in self.models if m["status"] != "removed"]
+        # Only purge models that were successfully removed from Gazebo
+        self.models = [m for m in self.models
+                       if not (m["status"] == "removed" and m["name"] in applied_names)]
+        # Only clear status for models that were actually pushed to Gazebo;
+        # failed models keep their current status so they can be retried.
         for model in self.models:
-            model["status"] = ""
+            if model["name"] in applied_names:
+                model["status"] = ""
+
+        n_ok = len(applied_names)
+        n_err = len(errors)
+        print(f"[DWG] apply_changes done — {n_ok} applied, {n_err} failed")
+        return errors
 
     def cleanup(self):
-        # Clean up processes and save world state
-        import signal
         if self.sdf_tree and self.world_path:
             try:
                 self.save_sdf(self.world_path)
             except Exception:
                 pass
 
-        # Terminate motion script process
         if self.script_process and self.script_process.poll() is None:
             try:
                 self.script_process.send_signal(signal.SIGINT)
@@ -406,7 +548,6 @@ class WorldManager:
                 pass
             self.script_process = None
 
-        # Terminate Gazebo process
         if self.process and self.process.poll() is None:
             try:
                 self.process.send_signal(signal.SIGINT)
@@ -423,7 +564,6 @@ class WorldManager:
             self.process = None
 
     def generate_model_sdf(self, model, for_service=False):
-        # Generate SDF snippet for a model
         model_type = model["type"]
         props = model["properties"]
         color_rgb = get_color(props["color"])
@@ -450,7 +590,7 @@ class WorldManager:
             elif model_type == "sphere":
                 size_str = f"{size[0]:.6f}"
 
-        static_str = "false" if "motion" in model["properties"] else "true"
+        static_str = "false" if "motion" in props else "true"
         sdf = f"""<model name='{model["name"]}'>
             <static>{static_str}</static>
             <type>{model_type}</type>
@@ -479,7 +619,7 @@ class WorldManager:
                         <diffuse>{color_rgb[0]} {color_rgb[1]} {color_rgb[2]} 1</diffuse>
                     </material>
                 </visual>"""
-        if not static_str == "true":
+        if static_str != "true":
             density = 1000.0
             if model_type in ["wall", "box"]:
                 w, l, h = map(float, size_str.split())
@@ -499,7 +639,7 @@ class WorldManager:
                 ixx = (2/5) * mass * r**2
                 iyy = ixx
                 izz = ixx
-            inertial_str = f"""<inertial>
+            sdf += f"""<inertial>
                 <mass>{mass:.6f}</mass>
                 <inertia>
                     <ixx>{ixx:.6f}</ixx><ixy>0</ixy><ixz>0</ixz>
@@ -507,7 +647,6 @@ class WorldManager:
                     <izz>{izz:.6f}</izz>
                 </inertia>
             </inertial>"""
-            sdf += inertial_str
             sdf += "<gravity>false</gravity>"
         sdf += """</link>"""
         if "motion" in props:
@@ -530,10 +669,6 @@ class WorldManager:
         return sdf
 
     def save_sdf(self, path):
-        # Save SDF file to disk
         if self.sdf_tree:
-            try:
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                self.sdf_tree.write(path, encoding="utf-8", xml_declaration=True)
-            except Exception as e:
-                raise
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            self.sdf_tree.write(path, encoding="utf-8", xml_declaration=True)

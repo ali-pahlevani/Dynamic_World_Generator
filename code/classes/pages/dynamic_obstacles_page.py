@@ -1,222 +1,282 @@
-from PyQt5.QtWidgets import QWizardPage, QHBoxLayout, QVBoxLayout, QComboBox, QListWidget, QPushButton, QLineEdit, QMessageBox, QGraphicsLineItem, QGraphicsEllipseItem, QWidget
+from PyQt5.QtWidgets import (
+    QWizardPage, QHBoxLayout, QVBoxLayout, QFormLayout, QComboBox,
+    QListWidget, QLineEdit, QMessageBox, QGraphicsLineItem,
+    QGraphicsEllipseItem, QWidget, QGroupBox, QLabel, QSizePolicy,
+)
 from PyQt5.QtCore import Qt, QEvent, QPointF, QLineF, QRectF
 from PyQt5.QtGui import QPen, QColor
 from classes.zoomable_graphics_view import ZoomableGraphicsView
+from classes.apply_worker import ApplyWorker
+from classes.responsive_widgets import WrapButton, ButtonRow
 import math
+
 
 class DynamicObstaclesPage(QWizardPage):
     def __init__(self, scene):
-        # Initialize wizard page with title and layout
         super().__init__()
         self.setTitle("Add Dynamic Obstacles")
         self.world_manager = None
         self.scene = scene
+        self.current_obstacle = None
+        self.current_motion_type = "linear"
+        self.points = []
+        self.clicking_enabled = False
+
+        # ── Left panel ─────────────────────────────────────────────
+        self.left_widget = QWidget()
+        self.left_widget.setFixedWidth(260)
+        left_layout = QVBoxLayout(self.left_widget)
+        left_layout.setContentsMargins(8, 8, 8, 8)
+        left_layout.setSpacing(10)
+
+        # Obstacle selection group
+        sel_group = QGroupBox("Select Obstacle")
+        sg_layout = QVBoxLayout(sel_group)
+        sg_layout.setSpacing(6)
         self.obstacle_list = QListWidget()
+        self.obstacle_list.itemClicked.connect(self.select_obstacle)
+        sg_layout.addWidget(self.obstacle_list)
+        left_layout.addWidget(sel_group)
+
+        # Motion type group
+        mtype_group = QGroupBox("Motion Type")
+        mg_layout = QVBoxLayout(mtype_group)
+        mg_layout.setSpacing(6)
         self.motion_type_combo = QComboBox()
         self.motion_type_combo.addItems(["Linear", "Elliptical", "Polygon"])
+        self.motion_type_combo.currentTextChanged.connect(self.update_motion_type)
+        mg_layout.addWidget(self.motion_type_combo)
+        left_layout.addWidget(mtype_group)
+
+        # Parameters group — QFormLayout keeps labels to the left of inputs
+        params_group = QGroupBox("Motion Parameters")
+        pg_layout = QFormLayout(params_group)
+        pg_layout.setSpacing(6)
+        pg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.velocity_input = QLineEdit()
-        self.velocity_input.setPlaceholderText("Velocity (m/s)")
+        self.velocity_input.setPlaceholderText("1.0")
+        pg_layout.addRow("Velocity (m/s)", self.velocity_input)
         self.std_input = QLineEdit()
-        self.std_input.setPlaceholderText("Std of randomness in velocity")
+        self.std_input.setPlaceholderText("0.1")
+        pg_layout.addRow("Std dev", self.std_input)
+        self._lbl_sm = QLabel("Semi-major")
         self.semi_major_input = QLineEdit()
-        self.semi_major_input.setPlaceholderText("Semi-major axis for Elliptical")
-        self.semi_major_input.setEnabled(False)
+        self.semi_major_input.setPlaceholderText("1.0")
+        pg_layout.addRow(self._lbl_sm, self.semi_major_input)
+        self._lbl_sn = QLabel("Semi-minor")
         self.semi_minor_input = QLineEdit()
-        self.semi_minor_input.setPlaceholderText("Semi-minor axis for Elliptical")
-        self.semi_minor_input.setEnabled(False)
-        self.start_button = QPushButton("Start Defining Path")
+        self.semi_minor_input.setPlaceholderText("0.5")
+        pg_layout.addRow(self._lbl_sn, self.semi_minor_input)
+        left_layout.addWidget(params_group)
+
+        # Path definition group
+        path_group = QGroupBox("Path Definition")
+        ph_layout = QVBoxLayout(path_group)
+        ph_layout.setSpacing(6)
+        self.status_label = QLabel("Select an obstacle to begin")
+        self.status_label.setWordWrap(True)
+        self.status_label.setStyleSheet("color: #7F8C8D; font-size: 9pt;")
+        ph_layout.addWidget(self.status_label)
+        self.start_button = WrapButton("Start Path")
         self.start_button.clicked.connect(self.start_path)
-        self.finish_button = QPushButton("Finish Path")
+        self.finish_button = WrapButton("Finish Path")
         self.finish_button.clicked.connect(self.finish_path)
-        self.apply_button = QPushButton("Apply and Preview")
+        ph_layout.addWidget(ButtonRow(self.start_button, self.finish_button))
+        left_layout.addWidget(path_group)
+
+        left_layout.addStretch(1)
+
+        self.apply_button = WrapButton("Apply and Preview", "success")
         self.apply_button.clicked.connect(self.apply_changes)
-
-        # Setup main layout with left panel and canvas
-        layout = QHBoxLayout()
-        left_widget = QWidget()
-        left_layout = QVBoxLayout()
-        left_layout.addWidget(self.motion_type_combo)
-        left_layout.addWidget(self.obstacle_list)
-        left_layout.addWidget(self.velocity_input)
-        left_layout.addWidget(self.std_input)
-        left_layout.addWidget(self.semi_major_input)
-        left_layout.addWidget(self.semi_minor_input)
-        left_layout.addWidget(self.start_button)
-        left_layout.addWidget(self.finish_button)
+        self.apply_button.setMinimumHeight(36)
         left_layout.addWidget(self.apply_button)
-        left_widget.setLayout(left_layout)
 
-        # Setup zoomable canvas
+        # ── Canvas ─────────────────────────────────────────────────
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
+        self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        # Set size constraints for canvas and left panel
-        window_width = 1500
-        canvas_width = int(window_width * 0.7)
-        self.view.setMinimumWidth(int(800 * 0.7))
-        self.view.setMaximumWidth(canvas_width)
-        left_widget.setMinimumWidth(150)
-        left_widget.setMaximumWidth(window_width - canvas_width - 260)
+        # ── Main layout ────────────────────────────────────────────
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.left_widget)
+        layout.addWidget(self.view, 1)
 
-        layout.addWidget(left_widget)
-        layout.addWidget(self.view)
-        self.setLayout(layout)
+        # Initialize field visibility
+        self._set_ellipse_fields_visible(False)
 
-        # Initialize path tracking and input states
-        self.current_obstacle = None
-        self.current_motion_type = None
-        self.points = []
-        self.clicking_enabled = False
-        self.current_motion_type = self.motion_type_combo.currentText().lower()
-        self.semi_major_input.setEnabled(self.current_motion_type == "elliptical")
-        self.semi_minor_input.setEnabled(self.current_motion_type == "elliptical")
+    # ── Helpers ────────────────────────────────────────────────────────────
 
-        # Connect signals for motion type and obstacle selection
-        self.motion_type_combo.currentTextChanged.connect(self.update_motion_type)
-        self.obstacle_list.itemClicked.connect(self.select_obstacle)
+    def _set_ellipse_fields_visible(self, visible):
+        for w in (self._lbl_sm, self.semi_major_input, self._lbl_sn, self.semi_minor_input):
+            w.setVisible(visible)
+
+    def _set_status(self, text):
+        self.status_label.setText(text)
+
+    # ── Lifecycle ──────────────────────────────────────────────────────────
 
     def initializePage(self):
-        # Set world manager and populate obstacle list
         self.world_manager = self.wizard().world_manager
         if not self.world_manager:
-            QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            QMessageBox.warning(self, "Error",
+                                "Select a simulation and create/load a world first.")
             return
         self.obstacle_list.clear()
-        for model in self.world_manager.models:
-            if model["type"] in ["box", "cylinder", "sphere"]:
-                self.obstacle_list.addItem(model["name"])
+        for m in self.world_manager.models:
+            if m["type"] in ("box", "cylinder", "sphere"):
+                self.obstacle_list.addItem(m["name"])
         self.wizard().refresh_canvas(self.scene)
 
+    # ── Motion type handling ───────────────────────────────────────────────
+
     def update_motion_type(self, text):
-        # Update motion type and input field states
         self.current_motion_type = text.lower()
+        self._set_ellipse_fields_visible(self.current_motion_type == "elliptical")
         self.clear_path()
         self.points = []
-        self.semi_major_input.setEnabled(self.current_motion_type == "elliptical")
-        self.semi_minor_input.setEnabled(self.current_motion_type == "elliptical")
 
     def select_obstacle(self, item):
-        # Load selected obstacle's motion properties
         self.current_obstacle = item.text()
-        model = next((m for m in self.world_manager.models if m["name"] == self.current_obstacle), None)
+        model = next((m for m in self.world_manager.models
+                      if m["name"] == self.current_obstacle), None)
         if model and "motion" in model["properties"]:
             motion = model["properties"]["motion"]
             self.motion_type_combo.blockSignals(True)
             self.motion_type_combo.setCurrentText(motion["type"].capitalize())
             self.motion_type_combo.blockSignals(False)
             self.current_motion_type = motion["type"]
+            self._set_ellipse_fields_visible(self.current_motion_type == "elliptical")
             self.velocity_input.setText(str(motion["velocity"]))
             self.std_input.setText(str(motion["std"]))
             if motion["type"] == "elliptical":
                 self.semi_major_input.setText(str(motion["semi_major"]))
                 self.semi_minor_input.setText(str(motion["semi_minor"]))
-            if motion["type"] in ["linear", "polygon"]:
-                self.points = [QPointF(x * 100, -y * 100) for x, y in motion["path"]]
-            elif motion["type"] == "elliptical":
                 center_m = model["properties"]["position"][:2]
-                center = QPointF(center_m[0] * 100, -center_m[1] * 100)
-                angle = motion["angle"]
-                dx = motion["semi_major"] * 100 * math.cos(angle)
-                dy = -motion["semi_major"] * 100 * math.sin(angle)
-                self.points = [center + QPointF(dx, dy)]
+                center = QPointF(center_m[0]*100, -center_m[1]*100)
+                ang = motion["angle"]
+                self.points = [center + QPointF(
+                    motion["semi_major"]*100*math.cos(ang),
+                    -motion["semi_major"]*100*math.sin(ang),
+                )]
+            else:
+                self.points = [QPointF(x*100, -y*100) for x, y in motion["path"]]
             self.draw_path(close_polygon=(motion["type"] == "polygon"))
+            self._set_status(f"Editing: {self.current_obstacle}")
         else:
             self.clear_path()
             self.points = []
-            self.velocity_input.clear()
-            self.std_input.clear()
-            self.semi_major_input.clear()
-            self.semi_minor_input.clear()
+            for inp in (self.velocity_input, self.std_input,
+                        self.semi_major_input, self.semi_minor_input):
+                inp.clear()
+            self._set_status(f"Click 'Start Path' to define motion for {self.current_obstacle}")
+
+    # ── Path definition ────────────────────────────────────────────────────
 
     def start_path(self):
-        # Begin defining motion path
-        if self.current_obstacle and self.current_motion_type:
-            self.clicking_enabled = True
-            self.points = []
-            self.clear_path()
+        if not self.current_obstacle or not self.current_motion_type:
+            self._set_status("Select an obstacle first")
+            return
+        self.clicking_enabled = True
+        self.points = []
+        self.clear_path()
+        tip = {"linear": "Click 2 points for the path",
+               "elliptical": "Click 1 point for orientation",
+               "polygon": "Click points; press Finish when done"}
+        self._set_status(tip.get(self.current_motion_type, "Click to define path"))
 
     def finish_path(self):
-        # Complete motion path definition
         self.clicking_enabled = False
-        self.draw_path(close_polygon=True if self.current_motion_type == "polygon" else False)
+        self.draw_path(close_polygon=(self.current_motion_type == "polygon"))
         self.store_motion()
+        self._set_status("Path saved. Click Apply to push to simulation.")
 
     def eventFilter(self, obj, event):
-        # Handle mouse clicks to define motion path points
-        if obj == self.view and event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton and self.clicking_enabled:
-            clicked_point = self.view.mapToScene(event.pos())
-            point = self.snap_to_grid(clicked_point)
+        if (obj == self.view and
+                event.type() == QEvent.MouseButtonPress and
+                event.button() == Qt.LeftButton and
+                self.clicking_enabled):
+            point = self.snap_to_grid(self.view.mapToScene(event.pos()))
             self.points.append(point)
             if self.current_motion_type == "linear" and len(self.points) == 2:
                 self.clicking_enabled = False
                 self.draw_path()
                 self.store_motion()
+                self._set_status("Linear path saved.")
             elif self.current_motion_type == "elliptical" and len(self.points) == 1:
                 self.clicking_enabled = False
                 self.draw_path()
                 self.store_motion()
+                self._set_status("Ellipse saved.")
             elif self.current_motion_type == "polygon":
                 self.draw_path()
+                self._set_status(f"{len(self.points)} points — press Finish when done")
             return True
         return super().eventFilter(obj, event)
 
     def snap_to_grid(self, point, grid_spacing=10):
-        # Snap point to grid for path placement
-        x = round(point.x() / grid_spacing) * grid_spacing
-        y = round(point.y() / grid_spacing) * grid_spacing
-        return QPointF(x, y)
+        return QPointF(
+            round(point.x() / grid_spacing) * grid_spacing,
+            round(point.y() / grid_spacing) * grid_spacing,
+        )
 
     def clear_path(self):
-        # Remove existing path items from scene
-        if self.current_obstacle and self.current_obstacle in self.wizard().path_items:
-            for item in self.wizard().path_items[self.current_obstacle]:
-                self.scene.removeItem(item)
-            del self.wizard().path_items[self.current_obstacle]
+        if (self.current_obstacle and
+                self.current_obstacle in self.wizard().path_items):
+            for pi in self.wizard().path_items.pop(self.current_obstacle):
+                self.scene.removeItem(pi)
 
     def draw_path(self, close_polygon=False):
-        # Draw motion path based on type
         self.clear_path()
         items = []
-        color = {"linear": "red", "elliptical": "green", "polygon": "blue"}[self.current_motion_type]
+        color_map = {"linear": "#E74C3C", "elliptical": "#27AE60", "polygon": "#4A90E2"}
+        color = color_map[self.current_motion_type]
+        pen = QPen(QColor(color), 2)
+
         if self.current_motion_type == "linear" and len(self.points) == 2:
-            line = QGraphicsLineItem(QLineF(self.points[0], self.points[1]))
-            line.setPen(QPen(QColor(color), 2))
-            self.scene.addItem(line)
-            items.append(line)
+            ln = QGraphicsLineItem(QLineF(self.points[0], self.points[1]))
+            ln.setPen(pen)
+            self.scene.addItem(ln)
+            items.append(ln)
+
         elif self.current_motion_type == "elliptical" and len(self.points) == 1:
             try:
-                semi_major = float(self.semi_major_input.text() or 1.0)
-                semi_minor = float(self.semi_minor_input.text() or 0.5)
+                sm = float(self.semi_major_input.text() or 1.0)
+                sn = float(self.semi_minor_input.text() or 0.5)
             except ValueError:
-                QMessageBox.warning(self, "Invalid Input", "Please enter valid semi-major and semi-minor axes.")
+                QMessageBox.warning(self, "Invalid Input",
+                                    "Enter valid semi-major and semi-minor values.")
                 return
-            model = next(m for m in self.world_manager.models if m["name"] == self.current_obstacle)
-            center_m = model["properties"]["position"][:2]
-            center = QPointF(center_m[0] * 100, -center_m[1] * 100)
+            model = next(m for m in self.world_manager.models
+                         if m["name"] == self.current_obstacle)
+            cx, cy = model["properties"]["position"][:2]
+            center = QPointF(cx*100, -cy*100)
             direction = self.points[0] - center
             angle = math.degrees(math.atan2(-direction.y(), direction.x()))
-            ellipse = QGraphicsEllipseItem(QRectF(-semi_major * 100, -semi_minor * 100, 2 * semi_major * 100, 2 * semi_minor * 100))
-            ellipse.setPos(center)
-            ellipse.setRotation(-angle)
-            ellipse.setPen(QPen(QColor(color), 2))
-            self.scene.addItem(ellipse)
-            items.append(ellipse)
+            ell = QGraphicsEllipseItem(QRectF(-sm*100, -sn*100, 2*sm*100, 2*sn*100))
+            ell.setPos(center)
+            ell.setRotation(-angle)
+            ell.setPen(pen)
+            self.scene.addItem(ell)
+            items.append(ell)
+
         elif self.current_motion_type == "polygon" and len(self.points) >= 2:
             for i in range(len(self.points) - 1):
-                line = QGraphicsLineItem(QLineF(self.points[i], self.points[i+1]))
-                line.setPen(QPen(QColor(color), 2))
-                self.scene.addItem(line)
-                items.append(line)
+                ln = QGraphicsLineItem(QLineF(self.points[i], self.points[i+1]))
+                ln.setPen(pen)
+                self.scene.addItem(ln)
+                items.append(ln)
             if close_polygon and len(self.points) >= 3:
-                line = QGraphicsLineItem(QLineF(self.points[-1], self.points[0]))
-                line.setPen(QPen(QColor(color), 2))
-                self.scene.addItem(line)
-                items.append(line)
+                ln = QGraphicsLineItem(QLineF(self.points[-1], self.points[0]))
+                ln.setPen(pen)
+                self.scene.addItem(ln)
+                items.append(ln)
+
         self.wizard().path_items[self.current_obstacle] = items
 
     def store_motion(self):
-        # Store motion properties for the selected obstacle
         if not self.current_obstacle or not self.current_motion_type or not self.points:
             return
         try:
@@ -225,50 +285,77 @@ class DynamicObstaclesPage(QWizardPage):
             if velocity <= 0:
                 raise ValueError("Velocity must be positive.")
             if std < 0:
-                raise ValueError("Standard deviation must be non-negative.")
+                raise ValueError("Std dev must be non-negative.")
             if self.current_motion_type == "linear" and len(self.points) == 2:
-                start = self.points[0]
-                end = self.points[1]
-                length = math.hypot((end.x() - start.x()) / 100, (end.y() - start.y()) / 100)
-                max_velocity = length / 0.001 * 0.5
-                if velocity > max_velocity:
-                    QMessageBox.warning(self, "Invalid Velocity",
-                                        f"Velocity {velocity} m/s is too high for a linear path of length {length:.2f} m. "
-                                        f"Recommended maximum velocity is {max_velocity:.2f} m/s.")
+                s, e = self.points[0], self.points[1]
+                length = math.hypot((e.x() - s.x()) / 100, (e.y() - s.y()) / 100)
+                max_v = length / 0.001 * 0.5
+                if velocity > max_v:
+                    QMessageBox.warning(
+                        self, "Velocity Too High",
+                        f"Path length {length:.2f} m — max recommended: {max_v:.1f} m/s"
+                    )
                     return
-        except ValueError as e:
-            QMessageBox.warning(self, "Invalid Input", f"Please enter valid velocity and std: {str(e)}")
+        except ValueError as ex:
+            QMessageBox.warning(self, "Invalid Input", str(ex))
             return
-        model = next(m for m in self.world_manager.models if m["name"] == self.current_obstacle)
+
+        model = next(m for m in self.world_manager.models
+                     if m["name"] == self.current_obstacle)
         motion = {"type": self.current_motion_type, "velocity": velocity, "std": std}
-        if self.current_motion_type in ["linear", "polygon"]:
-            path_m = [(p.x() / 100, -p.y() / 100) for p in self.points]
-            motion["path"] = path_m
+
+        if self.current_motion_type in ("linear", "polygon"):
+            motion["path"] = [(p.x()/100, -p.y()/100) for p in self.points]
         elif self.current_motion_type == "elliptical":
-            semi_major = float(self.semi_major_input.text() or 1.0)
-            semi_minor = float(self.semi_minor_input.text() or 0.5)
-            center_m = model["properties"]["position"][:2]
-            center = QPointF(center_m[0] * 100, -center_m[1] * 100)
+            sm = float(self.semi_major_input.text() or 1.0)
+            sn = float(self.semi_minor_input.text() or 0.5)
+            cx, cy = model["properties"]["position"][:2]
+            center = QPointF(cx*100, -cy*100)
             direction = self.points[0] - center
             angle = math.atan2(-direction.y(), direction.x())
-            motion["semi_major"] = semi_major
-            motion["semi_minor"] = semi_minor
+            motion["semi_major"] = sm
+            motion["semi_minor"] = sn
             motion["angle"] = angle
+
         model["properties"]["motion"] = motion
-        model["status"] = "updated" if model.get("status") else "new"
+        if model["status"] == "":
+            model["status"] = "updated"
 
     def apply_changes(self):
-        # Apply changes to the world and refresh canvas
         if not self.world_manager:
-            QMessageBox.warning(self, "Error", "Please select a simulation platform and create/load a world first.")
+            QMessageBox.warning(self, "Error",
+                                "Select a simulation and create/load a world first.")
             return
-        try:
-            self.world_manager.apply_changes()
-            self.wizard().refresh_canvas(self.scene)
-            QMessageBox.information(self, "Success", "Changes applied successfully.")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
+        self.apply_button.setEnabled(False)
+        self.apply_button.setText("Applying…")
+        self._worker = ApplyWorker(self.world_manager)
+        self._worker.finished.connect(self._on_applied)
+        self._worker.errored.connect(self._on_apply_error)
+        self._worker.start()
+
+    def _on_applied(self, errors):
+        self.apply_button.setEnabled(True)
+        self.apply_button.setText("Apply and Preview")
+        self.wizard().refresh_canvas(self.scene)
+        self._worker.deleteLater()
+        self._worker = None
+        if errors:
+            detail = "\n".join(f"• {n}: {msg}" for n, msg in errors)
+            QMessageBox.warning(
+                self, "Partial Failure",
+                f"{len(errors)} model(s) were not applied to Gazebo:\n\n{detail}\n\n"
+                "Check the terminal for the raw Gazebo service output.\n"
+                "You can click 'Apply and Preview' again to retry.",
+            )
+        else:
+            QMessageBox.information(self, "Success", "All changes applied to Gazebo.")
+
+    def _on_apply_error(self, msg):
+        self.apply_button.setEnabled(True)
+        self.apply_button.setText("Apply and Preview")
+        self._worker.deleteLater()
+        self._worker = None
+        QMessageBox.critical(self, "Error", f"Failed to apply changes:\n{msg}")
 
     def isComplete(self):
-        # Check if world manager and world name are set
         return self.world_manager is not None and self.world_manager.world_name is not None

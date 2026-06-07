@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Launch DWG Wizard from the repository root without needing to cd into code/.
+# Usage (from repo root): ./dwg_wizard
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/code"
+exec python3 dwg_wizard.py "$@"

@@ -1,206 +1,325 @@
-from PyQt5.QtWidgets import QWizardPage, QHBoxLayout, QVBoxLayout, QPushButton, QLineEdit, QListWidget, QMessageBox, QWidget
+from PyQt5.QtWidgets import (
+    QWizardPage, QHBoxLayout, QVBoxLayout, QFormLayout, QLineEdit,
+    QListWidget, QMessageBox, QWidget, QGroupBox, QLabel, QSizePolicy,
+)
 from PyQt5.QtCore import Qt, QEvent, QPointF
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QColor, QFont
 from classes.zoomable_graphics_view import ZoomableGraphicsView
+from classes.apply_worker import ApplyWorker
+from classes.responsive_widgets import WrapButton, ButtonRow
 import os
+import re
 import shutil
 from xml.etree import ElementTree as ET
 from utils.config import WORLDS_GAZEBO_DIR
 
+_VALID_WORLD_NAME = re.compile(r'^[A-Za-z0-9_]+$')
+
+
 class WallsDesignPage(QWizardPage):
     def __init__(self, scene):
-        # Initialize wizard page with title and layout
         super().__init__()
         self.setTitle("Design Walls")
-        self.registerField("world_name", self)
-        self.registerField("wall_list", self)
         self.world_manager = None
         self.scene = scene
 
-        # Setup main layout with left panel and canvas
-        layout = QHBoxLayout()
-        left_widget = QWidget()
-        left_layout = QVBoxLayout()
+        # ── Left panel ─────────────────────────────────────────────
+        self.left_widget = QWidget()
+        self.left_widget.setFixedWidth(260)
+        left_layout = QVBoxLayout(self.left_widget)
+        left_layout.setContentsMargins(8, 8, 8, 8)
+        left_layout.setSpacing(10)
 
-        # Add buttons and input fields to left panel
-        self.create_world_button = QPushButton("Create New World")
-        self.create_world_button.clicked.connect(self.create_new_world)
-        left_layout.addWidget(self.create_world_button)
-
-        self.load_world_button = QPushButton("Load World")
-        self.load_world_button.clicked.connect(self.load_world)
-        left_layout.addWidget(self.load_world_button)
-
+        # World group
+        world_group = QGroupBox("World")
+        wg_layout = QFormLayout(world_group)
+        wg_layout.setSpacing(6)
+        wg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.world_name_input = QLineEdit()
-        self.world_name_input.setPlaceholderText("World Name")
-        left_layout.addWidget(self.world_name_input)
+        self.world_name_input.setPlaceholderText("e.g. my_world")
+        wg_layout.addRow("Name", self.world_name_input)
+        self.create_world_button = WrapButton("Create New")
+        self.create_world_button.clicked.connect(self.create_new_world)
+        self.load_world_button = WrapButton("Load")
+        self.load_world_button.clicked.connect(self.load_world)
+        wg_layout.addRow(ButtonRow(self.create_world_button, self.load_world_button))
+        left_layout.addWidget(world_group)
 
+        # Walls group
+        walls_group = QGroupBox("Walls")
+        wls_layout = QVBoxLayout(walls_group)
+        wls_layout.setSpacing(6)
         self.wall_list = QListWidget()
-        left_layout.addWidget(self.wall_list)
-
-        self.remove_wall_button = QPushButton("Remove Selected Wall")
+        wls_layout.addWidget(self.wall_list)
+        self.remove_wall_button = WrapButton("Remove Selected", "danger")
         self.remove_wall_button.clicked.connect(self.remove_selected_wall)
-        left_layout.addWidget(self.remove_wall_button)
+        self.undo_wall_button = WrapButton("Undo", "secondary")
+        self.undo_wall_button.setEnabled(False)
+        self.undo_wall_button.clicked.connect(self.undo_remove_wall)
+        wls_layout.addWidget(ButtonRow(self.remove_wall_button, self.undo_wall_button))
+        left_layout.addWidget(walls_group)
+        self._removed_walls = []
 
+        # Properties group
+        props_group = QGroupBox("Wall Properties")
+        pg_layout = QFormLayout(props_group)
+        pg_layout.setSpacing(6)
+        pg_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.width_input = QLineEdit()
-        self.width_input.setPlaceholderText("Width (m)")
-        left_layout.addWidget(self.width_input)
-
+        self.width_input.setPlaceholderText("0.1")
+        pg_layout.addRow("Width (m)", self.width_input)
         self.height_input = QLineEdit()
-        self.height_input.setPlaceholderText("Height (m)")
-        left_layout.addWidget(self.height_input)
-
+        self.height_input.setPlaceholderText("1.0")
+        pg_layout.addRow("Height (m)", self.height_input)
         self.color_input = QLineEdit()
-        self.color_input.setPlaceholderText("Color (e.g., Black)")
-        left_layout.addWidget(self.color_input)
+        self.color_input.setPlaceholderText("Gray, Black, Red …")
+        pg_layout.addRow("Color", self.color_input)
+        left_layout.addWidget(props_group)
 
-        self.apply_button = QPushButton("Apply and Preview")
+        hint = QLabel("Click canvas: 1st point → 2nd point places a wall")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #7F8C8D; font-size: 9pt;")
+        left_layout.addWidget(hint)
+
+        left_layout.addStretch(1)
+
+        self.apply_button = WrapButton("Apply and Preview", "success")
         self.apply_button.clicked.connect(self.apply_changes)
+        self.apply_button.setMinimumHeight(36)
         left_layout.addWidget(self.apply_button)
-        left_widget.setLayout(left_layout)
 
-        # Setup zoomable canvas
+        # ── Canvas ─────────────────────────────────────────────────
         self.view = ZoomableGraphicsView(self.scene)
         self.view.setBackgroundBrush(QColor("white"))
         self.view.installEventFilter(self)
+        self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        # Set size constraints for canvas and left panel
-        window_width = 1500
-        canvas_width = int(window_width * 0.7)
-        self.view.setMinimumWidth(int(800 * 0.7))
-        self.view.setMaximumWidth(canvas_width)
-        left_widget.setMinimumWidth(150)
-        left_widget.setMaximumWidth(window_width - canvas_width - 260)
+        # ── Main layout ────────────────────────────────────────────
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.left_widget)
+        layout.addWidget(self.view, 1)
 
-        layout.addWidget(left_widget)
-        layout.addWidget(self.view)
-        self.setLayout(layout)
+    # ── Lifecycle ──────────────────────────────────────────────────────────
 
     def initializePage(self):
-        # Set world manager from wizard
         self.world_manager = self.wizard().world_manager
 
+    # ── Grid snapping ──────────────────────────────────────────────────────
+
     def snap_to_grid(self, point, grid_spacing=10):
-        # Snap point to grid for wall placement
-        x = round(point.x() / grid_spacing) * grid_spacing
-        y = round(point.y() / grid_spacing) * grid_spacing
-        return QPointF(x, y)
+        return QPointF(
+            round(point.x() / grid_spacing) * grid_spacing,
+            round(point.y() / grid_spacing) * grid_spacing,
+        )
+
+    def _next_wall_name(self):
+        existing = {m["name"] for m in self.world_manager.models if m["status"] != "removed"}
+        idx = 1
+        while f"wall_{idx}" in existing:
+            idx += 1
+        return f"wall_{idx}"
+
+    # ── Mouse interaction ──────────────────────────────────────────────────
 
     def eventFilter(self, obj, event):
-        # Handle mouse clicks to add walls
         if obj == self.view and self.world_manager:
             if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
-                if not hasattr(self, 'start_point'):
-                    clicked_point = self.view.mapToScene(event.pos())
-                    self.start_point = self.snap_to_grid(clicked_point)
+                pt = self.snap_to_grid(self.view.mapToScene(event.pos()))
+                if not hasattr(self, "_start_point"):
+                    self._start_point = pt
                 else:
-                    clicked_point = self.view.mapToScene(event.pos())
-                    end_point = self.snap_to_grid(clicked_point)
-                    wall_name = f"wall_{len(self.world_manager.models) + 1}"
+                    name = self._next_wall_name()
                     wall = {
-                        "name": wall_name,
+                        "name": name,
                         "type": "wall",
                         "properties": {
-                            "start": (self.start_point.x() / 100, -self.start_point.y() / 100),
-                            "end": (end_point.x() / 100, -end_point.y() / 100),
+                            "start": (self._start_point.x() / 100, -self._start_point.y() / 100),
+                            "end":   (pt.x() / 100, -pt.y() / 100),
                             "width": float(self.width_input.text() or 0.1),
                             "height": float(self.height_input.text() or 1.0),
-                            "color": self.color_input.text() or "Gray"
+                            "color": self.color_input.text().strip() or "Gray",
                         },
-                        "status": "new"
+                        "status": "new",
                     }
                     self.world_manager.add_model(wall)
-                    self.wall_list.addItem(wall_name)
+                    self.wall_list.addItem(name)
                     self.wizard().refresh_canvas(self.scene)
-                    del self.start_point
+                    del self._start_point
                 return True
         return super().eventFilter(obj, event)
 
+    # ── World actions ──────────────────────────────────────────────────────
+
     def create_new_world(self):
-        # Create a new world from empty template
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
         world_name = self.world_name_input.text().strip()
         if not world_name:
-            QMessageBox.warning(self, "Error", "Please enter a valid world name.")
+            QMessageBox.warning(self, "Error", "Please enter a world name.")
+            return
+        if not _VALID_WORLD_NAME.match(world_name):
+            QMessageBox.warning(self, "Invalid Name",
+                "World names may only contain letters, numbers, and underscores.\n"
+                "Spaces and special characters are not allowed by Gazebo.\n\n"
+                f"Try: {re.sub(r'[^A-Za-z0-9_]', '_', world_name)}")
             return
         try:
-            empty_world_path = os.path.join(WORLDS_GAZEBO_DIR, self.world_manager.version, "empty_world.sdf")
-            if not os.path.exists(empty_world_path):
-                raise FileNotFoundError(f"Empty world file not found: {empty_world_path}")
-            new_world_path = os.path.join(WORLDS_GAZEBO_DIR, self.world_manager.version, f"{world_name}.sdf")
-            shutil.copyfile(empty_world_path, new_world_path)
-            tree = ET.parse(new_world_path)
+            empty = os.path.join(WORLDS_GAZEBO_DIR, self.world_manager.version, "empty_world.sdf")
+            if not os.path.exists(empty):
+                raise FileNotFoundError(f"Empty world template not found: {empty}")
+            dest = os.path.join(WORLDS_GAZEBO_DIR, self.world_manager.version, f"{world_name}.sdf")
+            shutil.copyfile(empty, dest)
+            tree = ET.parse(dest)
             root = tree.getroot()
             world_elem = root.find("world")
-            if world_elem is not None:
-                world_elem.set("name", world_name)
-            else:
-                raise ValueError("SDF file does not contain a <world> element")
-            tree.write(new_world_path, encoding="utf-8", xml_declaration=True)
+            if world_elem is None:
+                raise ValueError("SDF file has no <world> element")
+            world_elem.set("name", world_name)
+            tree.write(dest, encoding="utf-8", xml_declaration=True)
             self.world_manager.load_world(world_name)
             self.wall_list.clear()
+            self._removed_walls.clear()
+            self.undo_wall_button.setEnabled(False)
             self.wizard().refresh_canvas(self.scene)
-            QMessageBox.information(self, "Success", f"Created and loaded new world: {world_name}")
+            QMessageBox.information(self, "Success", f"Created world: {world_name}")
             self.completeChanged.emit()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to create world: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to create world:\n{e}")
 
     def load_world(self):
-        # Load an existing world
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
         world_name = self.world_name_input.text().strip()
         if not world_name:
-            QMessageBox.warning(self, "Error", "Please enter a valid world name.")
+            QMessageBox.warning(self, "Error", "Please enter a world name.")
+            return
+        if not _VALID_WORLD_NAME.match(world_name):
+            QMessageBox.warning(self, "Invalid Name",
+                "World names may only contain letters, numbers, and underscores.\n"
+                "Spaces and special characters are not valid Gazebo service names.\n\n"
+                f"Rename the SDF file and its <world name=''> attribute to: "
+                f"{re.sub(r'[^A-Za-z0-9_]', '_', world_name)}")
             return
         try:
             self.world_manager.load_world(world_name)
             self.wall_list.clear()
+            self._removed_walls.clear()
+            self.undo_wall_button.setEnabled(False)
             self.wizard().refresh_canvas(self.scene)
-            for model in self.world_manager.models:
-                if model["type"] == "wall":
-                    self.wall_list.addItem(model["name"])
+            for m in self.world_manager.models:
+                if m["type"] == "wall":
+                    self.wall_list.addItem(m["name"])
             QMessageBox.information(self, "Success", f"Loaded world: {world_name}")
             self.completeChanged.emit()
         except FileNotFoundError as e:
             QMessageBox.critical(self, "Error", str(e))
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load world: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to load world:\n{e}")
 
     def remove_selected_wall(self):
-        # Remove selected wall from scene and world
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
         selected = self.wall_list.currentItem()
-        if selected:
-            wall_name = selected.text()
-            if wall_name in self.wizard().wall_items:
-                line, text = self.wizard().wall_items[wall_name]
-                self.scene.removeItem(line)
-                self.scene.removeItem(text)
-                del self.wizard().wall_items[wall_name]
-            for model in self.world_manager.models:
-                if model["name"] == wall_name:
-                    model["status"] = "removed"
-                    break
-            self.wall_list.takeItem(self.wall_list.row(selected))
+        if not selected:
+            return
+        name = selected.text()
+        row = self.wall_list.row(selected)
+
+        model = model_index = original_status = None
+        for i, m in enumerate(self.world_manager.models):
+            if m["name"] == name:
+                model, model_index, original_status = m, i, m["status"]
+                if m["status"] == "new":
+                    # Never pushed to Gazebo — drop it outright so its name
+                    # is immediately free for reuse by the next wall drawn.
+                    self.world_manager.models.remove(m)
+                else:
+                    m["status"] = "removed"
+                break
+
+        if name in self.wizard().wall_items:
+            line, text = self.wizard().wall_items.pop(name)
+            self.scene.removeItem(line)
+            self.scene.removeItem(text)
+        self.wall_list.takeItem(row)
+
+        if model is not None:
+            self._removed_walls.append({
+                "model": model,
+                "model_index": model_index,
+                "original_status": original_status,
+                "row": row,
+                "name": name,
+            })
+            self.undo_wall_button.setEnabled(True)
+
+    def undo_remove_wall(self):
+        if not self._removed_walls or not self.world_manager:
+            return
+        last = self._removed_walls.pop()
+        model = last["model"]
+        if last["original_status"] == "new":
+            idx = min(last["model_index"], len(self.world_manager.models))
+            self.world_manager.models.insert(idx, model)
+        else:
+            model["status"] = last["original_status"]
+
+        row = min(last["row"], self.wall_list.count())
+        self.wall_list.insertItem(row, last["name"])
+        self.wall_list.setCurrentRow(row)
+        self.wizard().refresh_canvas(self.scene)
+
+        self.undo_wall_button.setEnabled(bool(self._removed_walls))
 
     def apply_changes(self):
-        # Apply changes to the world and refresh canvas
         if not self.world_manager:
             QMessageBox.warning(self, "Error", "Please select a simulation platform first.")
             return
-        try:
-            self.world_manager.apply_changes()
-            self.wizard().refresh_canvas(self.scene)
-            QMessageBox.information(self, "Success", "Changes applied successfully.")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to apply changes: {str(e)}")
+        self.apply_button.setEnabled(False)
+        self.apply_button.setText("Applying…")
+        self._worker = ApplyWorker(self.world_manager)
+        self._worker.finished.connect(self._on_applied)
+        self._worker.errored.connect(self._on_apply_error)
+        self._worker.start()
+
+    def _on_applied(self, errors):
+        self.apply_button.setEnabled(True)
+        self.apply_button.setText("Apply and Preview")
+        # Apply may have renumbered walls to close gaps — rebuild the list
+        # so displayed names match world_manager.models again, and drop any
+        # pending undo history since the removed models' names/indices may
+        # now be stale.
+        self.wall_list.clear()
+        self._removed_walls.clear()
+        self.undo_wall_button.setEnabled(False)
+        for m in self.world_manager.models:
+            if m["type"] == "wall" and m["status"] != "removed":
+                self.wall_list.addItem(m["name"])
+        self.wizard().refresh_canvas(self.scene)
+        self._worker.deleteLater()
+        self._worker = None
+        if errors:
+            detail = "\n".join(f"• {n}: {msg}" for n, msg in errors)
+            QMessageBox.warning(
+                self, "Partial Failure",
+                f"{len(errors)} model(s) were not applied to Gazebo:\n\n{detail}\n\n"
+                "Check the terminal for the raw Gazebo service output.\n"
+                "You can click 'Apply and Preview' again to retry.",
+            )
+        else:
+            QMessageBox.information(self, "Success", "All changes applied to Gazebo.")
+
+    def _on_apply_error(self, msg):
+        self.apply_button.setEnabled(True)
+        self.apply_button.setText("Apply and Preview")
+        self._worker.deleteLater()
+        self._worker = None
+        QMessageBox.critical(self, "Error", f"Failed to apply changes:\n{msg}")
 
     def isComplete(self):
-        # Check if world manager and world name are set
         return self.world_manager is not None and self.world_manager.world_name is not None
