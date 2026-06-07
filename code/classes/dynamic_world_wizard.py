@@ -219,7 +219,7 @@ class DynamicWorldWizard(QWizard):
         self.path_items.clear()
 
         grid_spacing = 10
-        grid_pen = QPen(QColor("#E0E0E0"), 0.5)
+        grid_pen = QPen(QColor("#B0B0B0"), 0.5)
         for x in range(-1000, 1001, grid_spacing):
             scene.addLine(x, -1000, x, 1000, grid_pen)
         for y in range(-1000, 1001, grid_spacing):
