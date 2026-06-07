@@ -144,7 +144,7 @@ class StaticObstaclesPage(QWizardPage):
         )
 
     def _next_obstacle_name(self, obstacle_type):
-        existing = {m["name"] for m in self.world_manager.models}
+        existing = {m["name"] for m in self.world_manager.models if m["status"] != "removed"}
         idx = 1
         while f"{obstacle_type}_{idx}" in existing:
             idx += 1
@@ -212,7 +212,12 @@ class StaticObstaclesPage(QWizardPage):
                 self.scene.removeItem(pi)
         for m in self.world_manager.models:
             if m["name"] == name:
-                m["status"] = "removed"
+                if m["status"] == "new":
+                    # Never pushed to Gazebo — drop it outright so its name
+                    # is immediately free for reuse by the next obstacle drawn.
+                    self.world_manager.models.remove(m)
+                else:
+                    m["status"] = "removed"
                 break
         self.obstacle_list.takeItem(self.obstacle_list.row(selected))
 
