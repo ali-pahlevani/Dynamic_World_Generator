@@ -281,7 +281,17 @@ class WorldManager:
         errors = []          # (name, message)
         applied_names = set()  # models successfully pushed to Gazebo
 
-        for model in self.models[:]:
+        # Process every deletion (explicit removals AND the old-name half of
+        # a rename) before any creation/update. Renumbering can free up a
+        # name (e.g. old "box_3") that another entry is renamed *into* in the
+        # very same Apply — creating it first would leave two Gazebo entities
+        # briefly answering to the same name and desync our model dict from
+        # Gazebo's actual state (surfacing later as "Entity ... not found").
+        ordered_models = (
+            [m for m in self.models if m["status"] == "removed"] +
+            [m for m in self.models if m["status"] != "removed"]
+        )
+        for model in ordered_models:
             name = model["name"]
 
             # ── updated: delete existing, then re-create ─────────────────
