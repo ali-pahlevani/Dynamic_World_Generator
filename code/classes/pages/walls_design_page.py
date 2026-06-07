@@ -53,8 +53,12 @@ class WallsDesignPage(QWizardPage):
         wls_layout.addWidget(self.wall_list)
         self.remove_wall_button = WrapButton("Remove Selected", "danger")
         self.remove_wall_button.clicked.connect(self.remove_selected_wall)
-        wls_layout.addWidget(self.remove_wall_button)
+        self.undo_wall_button = WrapButton("Undo", "secondary")
+        self.undo_wall_button.setEnabled(False)
+        self.undo_wall_button.clicked.connect(self.undo_remove_wall)
+        wls_layout.addWidget(ButtonRow(self.remove_wall_button, self.undo_wall_button))
         left_layout.addWidget(walls_group)
+        self._removed_walls = []
 
         # Properties group
         props_group = QGroupBox("Wall Properties")
@@ -177,6 +181,8 @@ class WallsDesignPage(QWizardPage):
             tree.write(dest, encoding="utf-8", xml_declaration=True)
             self.world_manager.load_world(world_name)
             self.wall_list.clear()
+            self._removed_walls.clear()
+            self.undo_wall_button.setEnabled(False)
             self.wizard().refresh_canvas(self.scene)
             QMessageBox.information(self, "Success", f"Created world: {world_name}")
             self.completeChanged.emit()
@@ -201,6 +207,8 @@ class WallsDesignPage(QWizardPage):
         try:
             self.world_manager.load_world(world_name)
             self.wall_list.clear()
+            self._removed_walls.clear()
+            self.undo_wall_button.setEnabled(False)
             self.wizard().refresh_canvas(self.scene)
             for m in self.world_manager.models:
                 if m["type"] == "wall":
@@ -220,12 +228,12 @@ class WallsDesignPage(QWizardPage):
         if not selected:
             return
         name = selected.text()
-        if name in self.wizard().wall_items:
-            line, text = self.wizard().wall_items.pop(name)
-            self.scene.removeItem(line)
-            self.scene.removeItem(text)
-        for m in self.world_manager.models:
+        row = self.wall_list.row(selected)
+
+        model = model_index = original_status = None
+        for i, m in enumerate(self.world_manager.models):
             if m["name"] == name:
+                model, model_index, original_status = m, i, m["status"]
                 if m["status"] == "new":
                     # Never pushed to Gazebo — drop it outright so its name
                     # is immediately free for reuse by the next wall drawn.
@@ -233,7 +241,40 @@ class WallsDesignPage(QWizardPage):
                 else:
                     m["status"] = "removed"
                 break
-        self.wall_list.takeItem(self.wall_list.row(selected))
+
+        if name in self.wizard().wall_items:
+            line, text = self.wizard().wall_items.pop(name)
+            self.scene.removeItem(line)
+            self.scene.removeItem(text)
+        self.wall_list.takeItem(row)
+
+        if model is not None:
+            self._removed_walls.append({
+                "model": model,
+                "model_index": model_index,
+                "original_status": original_status,
+                "row": row,
+                "name": name,
+            })
+            self.undo_wall_button.setEnabled(True)
+
+    def undo_remove_wall(self):
+        if not self._removed_walls or not self.world_manager:
+            return
+        last = self._removed_walls.pop()
+        model = last["model"]
+        if last["original_status"] == "new":
+            idx = min(last["model_index"], len(self.world_manager.models))
+            self.world_manager.models.insert(idx, model)
+        else:
+            model["status"] = last["original_status"]
+
+        row = min(last["row"], self.wall_list.count())
+        self.wall_list.insertItem(row, last["name"])
+        self.wall_list.setCurrentRow(row)
+        self.wizard().refresh_canvas(self.scene)
+
+        self.undo_wall_button.setEnabled(bool(self._removed_walls))
 
     def apply_changes(self):
         if not self.world_manager:
@@ -250,8 +291,12 @@ class WallsDesignPage(QWizardPage):
         self.apply_button.setEnabled(True)
         self.apply_button.setText("Apply and Preview")
         # Apply may have renumbered walls to close gaps — rebuild the list
-        # so displayed names match world_manager.models again.
+        # so displayed names match world_manager.models again, and drop any
+        # pending undo history since the removed models' names/indices may
+        # now be stale.
         self.wall_list.clear()
+        self._removed_walls.clear()
+        self.undo_wall_button.setEnabled(False)
         for m in self.world_manager.models:
             if m["type"] == "wall" and m["status"] != "removed":
                 self.wall_list.addItem(m["name"])
