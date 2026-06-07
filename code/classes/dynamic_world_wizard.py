@@ -220,10 +220,10 @@ class DynamicWorldWizard(QWizard):
 
         grid_spacing = 10
         grid_pen = QPen(QColor("#B0B0B0"), 0.5)
-        for x in range(-1000, 1001, grid_spacing):
-            scene.addLine(x, -1000, x, 1000, grid_pen)
-        for y in range(-1000, 1001, grid_spacing):
-            scene.addLine(-1000, y, 1000, y, grid_pen)
+        for x in range(-2500, 2501, grid_spacing):
+            scene.addLine(x, -2500, x, 2500, grid_pen)
+        for y in range(-2500, 2501, grid_spacing):
+            scene.addLine(-2500, y, 2500, y, grid_pen)
 
         if not self.world_manager:
             return
